@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>영업메일 자동화</title>
+  <style>
+    :root{--ink:#182338;--muted:#748097;--line:#dce3ec;--paper:#fff;--bg:#f3f6f8;--navy:#172239;--green:#17664d;--mint:#edf7f2;--blue:#edf4ff;--yellow:#fff8e7}
+    *{box-sizing:border-box} body{margin:0;background:linear-gradient(135deg,#f5f8f4,#f1f4fa);color:var(--ink);font:14px/1.5 "Pretendard","Noto Sans KR",Arial,sans-serif}
+    button,input,select,textarea{font:inherit} button{cursor:pointer}
+    .wrap{max-width:1560px;margin:auto;padding:28px}
+    .top{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:18px}
+    .eyebrow{font-size:12px;font-weight:800;letter-spacing:.15em;color:var(--green)} h1{font-size:38px;line-height:1.1;margin:6px 0 0}
+    .status{color:var(--muted);font-size:13px}
+    nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+    nav a{color:#627088;text-decoration:none;padding:10px 15px;border:1px solid #d8e0e7;border-radius:12px;background:rgba(255,255,255,.72);font-weight:700}
+    nav a.active{background:var(--navy);border-color:var(--navy);color:#fff}
+    .grid{display:grid;grid-template-columns:330px minmax(520px,1fr) 330px;gap:16px;align-items:start}
+    .card{background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:22px;box-shadow:0 14px 38px rgba(28,44,68,.07);overflow:hidden}
+    .card-head{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid #edf0f4}
+    .card-head h2{font-size:18px;margin:0}.count{font-size:12px;color:var(--muted)}
+    .pad{padding:18px}.stack{display:grid;gap:10px}.row{display:flex;gap:8px}.row>*{flex:1}
+    label{display:grid;gap:6px;color:#58657a;font-size:12px;font-weight:700}
+    input,select,textarea{width:100%;border:1px solid #d6dee8;border-radius:11px;background:#fbfcfd;color:var(--ink);padding:11px 12px;outline:none}
+    input:focus,select:focus,textarea:focus{border-color:#6c8db8;box-shadow:0 0 0 3px rgba(75,117,173,.12)}
+    textarea{resize:vertical;min-height:90px}.mail-body{min-height:330px;line-height:1.7}
+    .btn{border:0;border-radius:11px;padding:11px 14px;font-weight:800;background:#e9eef4;color:#34445b}
+    .btn.primary{background:var(--green);color:#fff}.btn.dark{background:var(--navy);color:#fff}.btn.danger{background:#fff0f0;color:#a63b3b}
+    .search{margin:14px 16px 8px;width:calc(100% - 32px)}
+    .list{max-height:590px;overflow:auto;padding:8px}
+    .contact,.history-item{padding:12px;border:1px solid transparent;border-radius:14px;margin-bottom:6px;cursor:pointer}
+    .contact:hover,.contact.active{background:var(--blue);border-color:#cfddf2}.contact strong{display:block;font-size:14px}.sub{font-size:12px;color:var(--muted);margin-top:3px}
+    .composer-head{padding:18px 20px;background:linear-gradient(90deg,var(--mint),#fff)}
+    .selected{font-size:16px;font-weight:800}.selected small{display:block;font-size:12px;color:var(--muted);font-weight:500;margin-top:2px}
+    .templatebar{display:grid;grid-template-columns:1fr auto auto;gap:8px}
+    .drop{border:2px dashed #b8c6d5;border-radius:16px;background:#f8fafc;text-align:center;padding:24px 16px;color:#68778d;transition:.15s}
+    .drop.drag{border-color:var(--green);background:var(--mint);color:var(--green)}.drop input{display:none}
+    .files{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.file{display:flex;gap:7px;align-items:center;background:#eef3f7;border-radius:999px;padding:7px 10px;font-size:12px}
+    .file button{border:0;background:none;color:#9a3943;padding:0}
+    .actions{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:9px}
+    .hint{background:var(--yellow);border:1px solid #f1dfac;color:#735e24;border-radius:13px;padding:11px 13px;font-size:12px}
+    .signature{display:grid;grid-template-columns:110px 1fr auto;gap:18px;align-items:end;border:1px solid #dfe5ec;border-radius:16px;background:#fff;padding:20px 18px}
+    .signature img{width:88px;height:auto;object-fit:contain;align-self:end}.signature-copy{font-size:12px;line-height:1.6;color:#111}.signature-copy strong{font-size:13px;color:#111}.signature-copy b{display:inline-block;width:15px;color:#111}.signature-copy a{color:#0645d8}.locked{align-self:start;background:#edf2f7;color:#758196;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:800}
+    .fixed-cc{display:flex;gap:8px;align-items:flex-start;border:1px solid #d9e4ef;background:#f4f8fc;border-radius:13px;padding:11px 13px}.fixed-cc b{flex:0 0 auto;color:#315171}.cc-list{display:flex;gap:6px;flex-wrap:wrap}.cc-chip{background:#e3edf8;color:#315171;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700}
+    .history{max-height:420px;overflow:auto;padding:8px}.history-item{background:#fafbfd;border-color:#edf0f3;cursor:default}.history-item strong{display:block}.date{font-size:11px;color:#8994a6}
+    .empty{padding:34px 18px;text-align:center;color:#96a0b0}.modal{position:fixed;inset:0;background:rgba(16,25,40,.42);display:none;place-items:center;padding:24px;z-index:10}
+    .modal.show{display:grid}.modal-box{width:min(520px,100%);background:#fff;border-radius:20px;padding:22px;box-shadow:0 30px 90px rgba(0,0,0,.25)}
+    .modal-title{font-size:20px;font-weight:900;margin-bottom:14px}.toast{position:fixed;right:24px;bottom:24px;background:#172239;color:#fff;padding:12px 16px;border-radius:12px;opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none}.toast.show{opacity:1;transform:none}
+    @media(max-width:1100px){.grid{grid-template-columns:300px 1fr}.right{grid-column:1/-1}.history{max-height:260px}}
+    @media(max-width:760px){.wrap{padding:16px}.grid{grid-template-columns:1fr}h1{font-size:30px}.actions,.templatebar{grid-template-columns:1fr}.top{align-items:start;flex-direction:column}.right{grid-column:auto}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <div><div class="eyebrow">TOBUS · SALES MAIL</div><h1>영업메일 자동화</h1></div>
+    <div class="status" id="status">저장된 연락처와 마지막 발송본을 불러오는 중</div>
+  </header>
+  <nav>
+    <a href="/brand-connecting">브랜드 커넥팅</a>
+    <a href="/">Instagram DM</a><a href="/prices">네이버 가격 최신화</a><a href="/simulation">시뮬레이션</a>
+    <a href="/calendar">업무 캘린더</a><a href="/meetings">회의록</a><a href="/memos">메모</a><a class="active" href="/sales-email">영업메일</a>
+  </nav>
+
+  <section class="grid">
+    <aside class="card">
+      <div class="card-head"><h2>연락처</h2><button class="btn primary" id="newContact">+ 추가</button></div>
+      <input class="search" id="contactSearch" placeholder="이름·회사·이메일 검색">
+      <div class="list" id="contactList"></div>
+    </aside>
+
+    <section class="card">
+      <div class="composer-head">
+        <div class="selected" id="selectedContact">연락처를 선택해주세요<small>선택한 사람의 마지막 발송 메일이 자동으로 복원됩니다.</small></div>
+      </div>
+      <div class="pad stack">
+        <div class="templatebar">
+          <select id="templateSelect"><option value="">메일 양식 선택</option></select>
+          <button class="btn" id="saveTemplate">양식 저장</button>
+          <button class="btn" id="deleteTemplate">양식 삭제</button>
+        </div>
+        <div class="fixed-cc">
+          <b>항상 참조(CC)</b>
+          <div class="cc-list"><span class="cc-chip">zach@tobuscorp.com</span><span class="cc-chip">alex@tobuscorp.com</span><span class="cc-chip">jinny@tobuscorp.com</span></div>
+          <span class="locked">고정</span>
+        </div>
+        <label>메일 제목<input id="subject" placeholder="메일 제목을 입력하세요"></label>
+        <label>메일 내용<textarea class="mail-body" id="body" placeholder="메일 내용을 입력하세요. {{담당자명}}, {{회사명}}을 사용할 수 있습니다."></textarea></label>
+        <div>
+          <label style="margin-bottom:7px">고정 메일 서명 · 항상 본문 마지막에 자동 첨부</label>
+          <div class="signature">
+            <img src="https://sign.mail.worksmobile.com/signature/logo/kr1/8QbqKoKZKAgqKoKZBqEqKqE./SZbwKAgmKAumFoKmKxg9FApjaAbZKogqKovlFxtmKogq" alt="TOBUS">
+            <div class="signature-copy">
+              <strong>Young jun Park</strong> | 박영준<br>
+              Assistant Manager | 글로벌 e-Biz 매니저<br><br>
+              <b>M</b> 82.10.8455.0229<br><br>
+              <b>E</b> <a href="mailto:Rogers@tobuscorp.com">Rogers@tobuscorp.com</a><br><br>
+              <b>T</b> 82.70.4113.4900<br><br>
+              <b>A</b> #1101, GIFC Tower, 240 Kintex-ro, Goyang-si, Republic of Korea
+            </div>
+            <span class="locked">고정</span>
+          </div>
+        </div>
+        <div>
+          <div class="drop" id="dropZone">
+            <strong>첨부파일을 여기에 끌어다 놓으세요</strong><br>
+            <span>또는 눌러서 파일 선택 · 파일당 최대 25MB</span>
+            <input id="fileInput" type="file" multiple>
+          </div>
+          <div class="files" id="fileList"></div>
+        </div>
+        <div class="hint">설치된 Outlook 앱에 받는 사람·고정 참조·제목·본문·첨부파일·로고 서명을 모두 넣은 새 메일 창을 엽니다. 실제 발송은 Outlook의 보내기 버튼을 눌러주세요.</div>
+        <div class="actions">
+          <button class="btn" id="saveDraft">임시 저장</button>
+          <button class="btn dark" id="openOutlook">Outlook 초안 만들기</button>
+          <button class="btn primary" id="recordSent">발송 완료로 기록</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="right stack">
+      <section class="card">
+        <div class="card-head"><h2>연락처 정보</h2><span class="count">수정 후 저장</span></div>
+        <div class="pad stack">
+          <input type="hidden" id="contactId">
+          <div class="row"><label>담당자명<input id="contactName"></label><label>회사명<input id="contactCompany"></label></div>
+          <label>이메일<input id="contactEmail" type="email"></label>
+          <label>메모<textarea id="contactMemo" placeholder="관계, 제안 이력, 주의사항"></textarea></label>
+          <div class="row"><button class="btn primary" id="saveContact">연락처 저장</button><button class="btn danger" id="deleteContact">삭제</button></div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>최근 발송 이력</h2><span class="count" id="historyCount">0건</span></div>
+        <div class="history" id="historyList"></div>
+      </section>
+    </aside>
+  </section>
+</main>
+
+<div class="modal" id="templateModal">
+  <div class="modal-box stack">
+    <div class="modal-title">메일 양식 저장</div>
+    <label>양식명<input id="templateName" placeholder="예: 신규 브랜드 제안"></label>
+    <div class="row"><button class="btn" id="cancelTemplate">취소</button><button class="btn primary" id="confirmTemplate">저장</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  const $=s=>document.querySelector(s);
+  let store={contacts:[],templates:[],drafts:{},history:[]}, selectedId="", attachments=[];
+  const signatureText=`Young jun Park | 박영준
+Assistant Manager | 글로벌 e-Biz 매니저
+
+M 82.10.8455.0229
+E Rogers@tobuscorp.com
+T 82.70.4113.4900
+A #1101, GIFC Tower, 240 Kintex-ro, Goyang-si, Republic of Korea`;
+  const fixedCc=["zach@tobuscorp.com","alex@tobuscorp.com","jinny@tobuscorp.com"];
+  const fullMailBody=()=>`${$("#body").value.trim()}\n\n${signatureText}`.trim();
+  const htmlEscape=s=>String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const signatureHtml=`<table role="presentation" cellpadding="0" cellspacing="0" style="font-family:Arial,'Malgun Gothic',sans-serif;color:#000;font-size:12px"><tr><td style="width:120px;vertical-align:bottom;padding-right:22px"><img src="https://sign.mail.worksmobile.com/signature/logo/kr1/8QbqKoKZKAgqKoKZBqEqKqE./SZbwKAgmKAumFoKmKxg9FApjaAbZKogqKovlFxtmKogq" width="88" alt="TOBUS" style="display:block;border:0"></td><td style="vertical-align:top;line-height:1.5"><b>Young jun Park</b> | 박영준<br>Assistant Manager | 글로벌 e-Biz 매니저<br><br><b>M</b> 82.10.8455.0229<br><br><b>E</b> <a href="mailto:Rogers@tobuscorp.com">Rogers@tobuscorp.com</a><br><br><b>T</b> 82.70.4113.4900<br><br><b>A</b> #1101, GIFC Tower, 240 Kintex-ro, Goyang-si, Republic of Korea</td></tr></table>`;
+  const fullMailHtml=()=>`<div style="font-family:Arial,'Malgun Gothic',sans-serif;font-size:14px;line-height:1.65">${htmlEscape($("#body").value).replace(/\n/g,"<br>")}</div><br><br>${signatureHtml}`;
+  const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const toast=msg=>{const el=$("#toast");el.textContent=msg;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)};
+  async function api(payload){const r=await fetch("/api/sales-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const j=await r.json();if(!r.ok)throw Error(j.error||"저장에 실패했습니다.");return j}
+  const currentContact=()=>store.contacts.find(x=>x.id===selectedId);
+  function renderContacts(){
+    const q=$("#contactSearch").value.trim().toLowerCase();
+    const rows=store.contacts.filter(c=>[c.name,c.company,c.email].join(" ").toLowerCase().includes(q));
+    $("#contactList").innerHTML=rows.length?rows.map(c=>`<div class="contact ${c.id===selectedId?"active":""}" data-id="${c.id}"><strong>${esc(c.name)}${c.company?` · ${esc(c.company)}`:""}</strong><div class="sub">${esc(c.email)}</div></div>`).join(""):`<div class="empty">연락처를 추가해주세요.</div>`;
+    $("#contactList").querySelectorAll(".contact").forEach(el=>el.onclick=()=>selectContact(el.dataset.id));
+  }
+  function renderTemplates(){
+    const value=$("#templateSelect").value;
+    $("#templateSelect").innerHTML=`<option value="">메일 양식 선택</option>`+store.templates.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("");
+    if(store.templates.some(t=>t.id===value))$("#templateSelect").value=value;
+  }
+  function renderFiles(){
+    $("#fileList").innerHTML=attachments.map((f,i)=>`<span class="file">📎 ${esc(f.name)} <small>${Math.ceil(f.size/1024)}KB</small><button data-i="${i}">×</button></span>`).join("");
+    $("#fileList").querySelectorAll("button").forEach(b=>b.onclick=()=>{attachments.splice(+b.dataset.i,1);renderFiles()});
+  }
+  function renderHistory(){
+    const rows=store.history.filter(h=>!selectedId||h.contact_id===selectedId);
+    $("#historyCount").textContent=`${rows.length}건`;
+    $("#historyList").innerHTML=rows.length?rows.map(h=>`<div class="history-item"><strong>${esc(h.contact_name)} · ${esc(h.subject)}</strong><div class="sub">${esc(h.email)}</div><div class="date">${new Date(h.sent_at).toLocaleString("ko-KR")}</div></div>`).join(""):`<div class="empty">발송 이력이 없습니다.</div>`;
+  }
+  function fillContact(c={}){
+    $("#contactId").value=c.id||"";$("#contactName").value=c.name||"";$("#contactCompany").value=c.company||"";
+    $("#contactEmail").value=c.email||"";$("#contactMemo").value=c.memo||"";
+  }
+  function selectContact(id){
+    selectedId=id;const c=currentContact();if(!c)return;
+    fillContact(c);$("#selectedContact").innerHTML=`${esc(c.name)}${c.company?` · ${esc(c.company)}`:""}<small>${esc(c.email)} · 마지막 발송본이 있으면 그대로 불러왔습니다.</small>`;
+    const d=store.drafts[id];
+    if(d){$("#subject").value=d.subject||"";$("#body").value=d.body||"";$("#templateSelect").value=d.template_id||"";attachments=[...(d.attachments||[])]}
+    else{$("#subject").value="";$("#body").value="";$("#templateSelect").value="";attachments=[]}
+    renderContacts();renderFiles();renderHistory();
+  }
+  function merge(text,c){return String(text||"").replaceAll("{{담당자명}}",c.name||"").replaceAll("{{회사명}}",c.company||"").replaceAll("{{플랫폼}}",c.platform||"")}
+  async function saveDraft(silent=false){
+    const c=currentContact();if(!c)throw Error("연락처를 먼저 선택해주세요.");
+    const result=await api({action:"save_draft",contact_id:c.id,template_id:$("#templateSelect").value,subject:$("#subject").value,body:$("#body").value,attachments});
+    store.drafts[c.id]=result.draft;if(!silent)toast("임시 저장했습니다.");
+  }
+  async function load(){
+    const r=await fetch("/api/sales-email");store=await r.json();renderContacts();renderTemplates();renderHistory();
+    $("#status").textContent=`연락처 ${store.contacts.length}명 · 양식 ${store.templates.length}개`;
+    if(store.contacts.length)selectContact(store.contacts[0].id);
+  }
+  $("#contactSearch").oninput=renderContacts;
+  $("#newContact").onclick=()=>{selectedId="";fillContact();$("#selectedContact").innerHTML=`새 연락처<small>정보를 입력하고 저장해주세요.</small>`;renderContacts();renderHistory()};
+  $("#saveContact").onclick=async()=>{try{const existing=currentContact();const r=await api({action:"save_contact",id:$("#contactId").value,name:$("#contactName").value,company:$("#contactCompany").value,email:$("#contactEmail").value,platform:existing?.platform||"",memo:$("#contactMemo").value});const i=store.contacts.findIndex(x=>x.id===r.contact.id);if(i>=0)store.contacts[i]=r.contact;else store.contacts.push(r.contact);selectContact(r.contact.id);toast("연락처를 저장했습니다.")}catch(e){toast(e.message)}};
+  $("#deleteContact").onclick=async()=>{if(!selectedId||!confirm("이 연락처를 삭제할까요?"))return;try{await api({action:"delete_contact",id:selectedId});store.contacts=store.contacts.filter(x=>x.id!==selectedId);delete store.drafts[selectedId];selectedId="";fillContact();renderContacts();renderHistory();toast("삭제했습니다.")}catch(e){toast(e.message)}};
+  $("#templateSelect").onchange=()=>{const t=store.templates.find(x=>x.id===$("#templateSelect").value),c=currentContact();if(t&&c){$("#subject").value=merge(t.subject,c);$("#body").value=merge(t.body,c)}};
+  $("#saveTemplate").onclick=()=>{$("#templateName").value=store.templates.find(x=>x.id===$("#templateSelect").value)?.name||"";$("#templateModal").classList.add("show")};
+  $("#cancelTemplate").onclick=()=>$("#templateModal").classList.remove("show");
+  $("#confirmTemplate").onclick=async()=>{try{const r=await api({action:"save_template",id:$("#templateSelect").value,name:$("#templateName").value,subject:$("#subject").value,body:$("#body").value});const i=store.templates.findIndex(x=>x.id===r.template.id);if(i>=0)store.templates[i]=r.template;else store.templates.push(r.template);renderTemplates();$("#templateSelect").value=r.template.id;$("#templateModal").classList.remove("show");toast("메일 양식을 저장했습니다.")}catch(e){toast(e.message)}};
+  $("#deleteTemplate").onclick=async()=>{const id=$("#templateSelect").value;if(!id||!confirm("이 메일 양식을 삭제할까요?"))return;try{await api({action:"delete_template",id});store.templates=store.templates.filter(x=>x.id!==id);renderTemplates();toast("양식을 삭제했습니다.")}catch(e){toast(e.message)}};
+  $("#saveDraft").onclick=()=>saveDraft().catch(e=>toast(e.message));
+  const dz=$("#dropZone"),fi=$("#fileInput");dz.onclick=()=>fi.click();["dragenter","dragover"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.add("drag")}));["dragleave","drop"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.remove("drag")}));dz.ondrop=e=>uploadFiles(e.dataTransfer.files);fi.onchange=()=>uploadFiles(fi.files);
+  async function uploadFiles(files){for(const file of files){try{const r=await fetch(`/api/sales-email/attachments?filename=${encodeURIComponent(file.name)}`,{method:"POST",headers:{"Content-Type":file.type||"application/octet-stream"},body:file});const j=await r.json();if(!r.ok)throw Error(j.error||"첨부 실패");attachments.push(j.attachment);renderFiles()}catch(e){toast(e.message)}}fi.value=""}
+  $("#openOutlook").onclick=async()=>{try{const c=currentContact();if(!c)throw Error("연락처를 먼저 선택해주세요.");await saveDraft(true);const r=await fetch("/api/sales-email/outlook-draft",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contact_id:c.id,cc:fixedCc,subject:$("#subject").value,full_body:fullMailBody(),full_html:fullMailHtml(),attachments})});const j=await r.json();if(!r.ok)throw Error(j.error||"Outlook 작성 팝업을 열지 못했습니다.");toast(j.message)}catch(e){toast(e.message)}};
+  $("#recordSent").onclick=async()=>{try{const c=currentContact();if(!c)throw Error("연락처를 먼저 선택해주세요.");if(!confirm(`${c.name}님에게 보낸 메일로 기록할까요?`))return;const r=await api({action:"record_sent",contact_id:c.id,cc:fixedCc,template_id:$("#templateSelect").value,subject:$("#subject").value,body:$("#body").value,full_body:fullMailBody(),full_html:fullMailHtml(),attachments});store.history.unshift(r.record);store.drafts[c.id]={contact_id:c.id,template_id:r.record.template_id,subject:r.record.subject,body:r.record.body,attachments:r.record.attachments,updated_at:r.record.sent_at,last_sent_at:r.record.sent_at};renderHistory();toast("고정 참조와 HTML 서명을 포함한 발송 이력을 기록했습니다.")}catch(e){toast(e.message)}};
+  load().catch(e=>toast(e.message));
+</script>
+</body>
+</html>

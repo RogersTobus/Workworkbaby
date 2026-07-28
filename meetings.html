@@ -1,0 +1,399 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>회의록</title>
+  <style>
+    :root{
+      --ink:#17233b;--muted:#7f899d;--line:#e4e9f1;--paper:#fff;
+      --bg:#f5f7fb;--blue:#365edc;--blue-soft:#eef2ff;--red:#d4515d;
+      --red-soft:#fff1f2;--green:#218a68;--green-soft:#eaf8f2;
+      --amber:#a86a00;--amber-soft:#fff8e6;--shadow:0 18px 45px rgba(29,42,78,.09)
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:Pretendard,"Noto Sans KR","Apple SD Gothic Neo",sans-serif}
+    button,input,textarea{font:inherit}
+    main{width:min(1500px,calc(100% - 36px));margin:30px auto 52px}
+    header{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:18px}
+    .eyebrow{font-size:12px;font-weight:800;letter-spacing:.16em;color:var(--blue);margin-bottom:7px}
+    h1{margin:0;font-size:32px;letter-spacing:-.04em}
+    .safe{font-size:13px;color:var(--muted)}
+    .nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+    .nav a{color:#64708a;text-decoration:none;padding:10px 14px;border-radius:12px;font-size:14px;font-weight:750}
+    .nav a:hover{background:#fff}.nav a.active{color:#fff;background:var(--ink)}
+    .workspace{display:grid;grid-template-columns:330px minmax(0,1fr);gap:16px;align-items:start}
+    .note-list-shell,.editor-shell{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
+    .note-list-shell{position:sticky;top:16px;overflow:hidden}
+    .list-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:17px;border-bottom:1px solid var(--line)}
+    .list-head h2{margin:0;font-size:17px}
+    .new-button{border:0;border-radius:10px;background:var(--blue);color:#fff;padding:8px 11px;font-size:12px;font-weight:850;cursor:pointer}
+    .note-list{max-height:calc(100vh - 240px);overflow-y:auto;padding:8px}
+    .note-item{width:100%;display:block;border:0;border-radius:12px;background:transparent;padding:11px;text-align:left;cursor:pointer}
+    .note-item:hover{background:#f5f7fb}.note-item.active{background:var(--blue-soft);box-shadow:inset 0 0 0 1px #d8e0ff}
+    .note-item-date{color:var(--blue);font-size:10px;font-weight:850}
+    .note-item-title{margin-top:4px;font-size:14px;font-weight:850;line-height:1.35;overflow-wrap:anywhere}
+    .note-item-meta{margin-top:5px;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .list-empty{padding:34px 15px;text-align:center;color:var(--muted);font-size:13px}
+    .editor-shell{padding:22px}
+    .editor-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+    .editor-toolbar h2{margin:0;font-size:21px}
+    .editor-actions{display:flex;gap:7px}
+    .editor-actions button,.button{border:0;border-radius:10px;padding:9px 13px;font-size:12px;font-weight:850;cursor:pointer}
+    button:disabled{opacity:.55;cursor:wait}
+    .save-button{background:var(--blue);color:#fff}
+    .delete-button{background:#fff0f1;color:var(--red)}
+    .delete-button.confirming{background:var(--red);color:#fff}
+    .editor-grid{display:grid;grid-template-columns:1fr 190px;gap:13px}
+    label{display:grid;gap:6px;color:#5f6b82;font-size:12px;font-weight:850}
+    input,textarea{width:100%;border:1px solid #d4dce8;border-radius:11px;background:#fbfcfe;color:var(--ink);padding:10px 11px;outline:none}
+    input:focus,textarea:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(54,94,220,.1)}
+    .attendees{grid-column:1/-1}
+    .sections{display:grid;gap:13px;margin-top:14px}
+    textarea{resize:vertical;line-height:1.6;min-height:150px}
+    #content{min-height:430px}
+    #decisions,#actions{min-height:115px}
+    .recorder{margin:16px 0;border:1px solid #f2c9cd;border-radius:16px;background:linear-gradient(135deg,#fff7f7,#fff);overflow:hidden}
+    .recorder-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px;border-bottom:1px solid #f6dadd}
+    .recorder-title{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:900}
+    .record-dot{width:10px;height:10px;border-radius:50%;background:var(--red)}
+    .record-dot.live{animation:pulse 1.2s infinite}
+    @keyframes pulse{50%{box-shadow:0 0 0 7px rgba(212,81,93,.14)}}
+    .record-status{font-variant-numeric:tabular-nums;color:var(--red);font-size:13px;font-weight:900}
+    .recorder-body{padding:15px 16px}
+    .record-mode{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
+    .record-mode label{display:block;position:relative;cursor:pointer}
+    .record-mode input{position:absolute;opacity:0;pointer-events:none}
+    .record-mode span{display:block;padding:11px 12px;border:1px solid #eadadd;border-radius:11px;background:#fff;color:#75676b;font-size:12px;font-weight:850;text-align:center}
+    .record-mode input:checked+span{border-color:var(--red);background:var(--red-soft);color:var(--red);box-shadow:inset 0 0 0 1px var(--red)}
+    .mode-guide{margin:-4px 0 12px;padding:10px 12px;border-radius:10px;background:#fff;color:#8b7479;font-size:10px;line-height:1.55}
+    .record-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .record-controls button{border:0;border-radius:11px;padding:10px 14px;font-size:12px;font-weight:900;cursor:pointer}
+    .record-start{background:var(--red);color:#fff}.record-pause{background:#fff0f1;color:var(--red)}.record-stop{background:var(--ink);color:#fff}
+    .music-option{display:flex;grid-template-columns:auto 1fr;align-items:center;gap:7px;margin:12px 0 0;color:#76535a;font-size:11px;font-weight:700}
+    .music-option input{width:16px;height:16px;padding:0}
+    .music-help{margin-top:8px;color:#9a7d82;font-size:10px;line-height:1.5}
+    .recovery{margin-top:10px;padding:10px;border-radius:10px;background:var(--amber-soft);color:var(--amber);font-size:11px;font-weight:800}
+    .recovery button{margin-left:8px;border:0;border-radius:8px;background:#fff;color:var(--amber);padding:6px 8px;font-weight:900;cursor:pointer}
+    .recordings{display:grid;gap:9px;margin-top:13px}
+    .recording-empty{padding:12px;border:1px dashed #eccdd0;border-radius:11px;color:#aa8589;text-align:center;font-size:11px}
+    .recording-item{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:10px;align-items:center;padding:10px;border:1px solid #efdadd;border-radius:12px;background:#fff}
+    .recording-main{display:grid;grid-template-columns:minmax(180px,420px) 1fr;gap:10px;align-items:center}
+    audio{width:100%;height:34px}
+    .recording-meta{font-size:10px;color:var(--muted);font-weight:750}
+    .recording-actions{display:flex;gap:5px}.recording-actions a,.recording-actions button{border:0;border-radius:8px;padding:7px 8px;background:#f5f7fb;color:#64708a;text-decoration:none;font-size:10px;font-weight:850;cursor:pointer}
+    .import-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #f3dcdf;color:#91777b;font-size:10px}
+    .import-button{display:inline-flex;align-items:center;border-radius:9px;background:#fff0f1;color:var(--red);padding:8px 10px;font-size:10px;font-weight:900;cursor:pointer}
+    .import-button input{display:none}
+    .ai-panel{margin:0 0 16px;padding:15px 16px;border:1px solid #cfd8ff;border-radius:16px;background:linear-gradient(135deg,#f3f6ff,#fff)}
+    .ai-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+    .ai-title{font-size:14px;font-weight:900}.ai-copy{margin-top:4px;color:#7180a0;font-size:11px;line-height:1.5}
+    .ai-button{white-space:nowrap;border:0;border-radius:11px;background:var(--blue);color:#fff;padding:11px 14px;font-size:12px;font-weight:900;cursor:pointer}
+    .local-status{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:7px 9px;border-radius:9px;background:var(--green-soft);color:var(--green);font-size:10px;font-weight:900}
+    .local-status.loading{background:var(--amber-soft);color:var(--amber)}
+    .transcript{margin-top:12px}.transcript summary{cursor:pointer;color:#65718a;font-size:11px;font-weight:850}
+    .transcript textarea{margin-top:8px;min-height:170px;font-size:11px}
+    .writing-guide{margin-top:16px;padding:12px 14px;border-radius:12px;background:#f7f9fc;color:#7c879a;font-size:11px;line-height:1.6}
+    .toast{position:fixed;right:24px;bottom:24px;background:var(--ink);color:#fff;padding:12px 16px;border-radius:12px;box-shadow:var(--shadow);font-size:13px;opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s;max-width:420px}
+    .toast.show{opacity:1;transform:translateY(0)}
+    @media(max-width:850px){
+      main{width:min(100% - 16px,1500px);margin-top:16px}
+      header{align-items:flex-start;flex-direction:column}
+      .workspace{grid-template-columns:1fr}.note-list-shell{position:static}
+      .note-list{max-height:260px}.editor-grid{grid-template-columns:1fr}.attendees{grid-column:auto}
+      .ai-row,.recorder-head{align-items:flex-start;flex-direction:column}.recording-item,.recording-main{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div><div class="eyebrow">TOBUS · MEETING NOTES</div><h1>회의록</h1></div>
+      <div class="safe">회의를 녹음하고 AI가 내용·결정 사항·후속 업무를 정리합니다</div>
+    </header>
+    <nav class="nav" aria-label="업무 메뉴">
+      <a href="/brand-connecting">브랜드 커넥팅</a>
+      <a href="/">Instagram DM</a>
+      <a href="/prices">네이버 가격 최신화</a>
+      <a href="/simulation">시뮬레이션</a>
+      <a href="/calendar">업무 캘린더</a>
+      <a class="active" href="/meetings">회의록</a>
+      <a href="/memos">메모</a>
+      <a href="/sales-email">영업메일</a>
+  </nav>
+    <div class="workspace">
+      <aside class="note-list-shell">
+        <div class="list-head"><h2>회의 목록</h2><button id="newNote" class="new-button" type="button">+ 새 회의록</button></div>
+        <div id="noteList" class="note-list"></div>
+      </aside>
+      <section class="editor-shell">
+        <div class="editor-toolbar">
+          <h2 id="editorTitle">새 회의록 작성</h2>
+          <div class="editor-actions">
+            <button id="deleteNote" class="delete-button" type="button" hidden>삭제</button>
+            <button id="saveNote" class="save-button" type="button">회의록 저장</button>
+          </div>
+        </div>
+        <div class="editor-grid">
+          <label>회의 제목<input id="title" type="text" maxlength="200" placeholder="회의 제목을 입력하세요"></label>
+          <label>회의 날짜<input id="meetingDate" type="date"></label>
+          <label class="attendees">참석자<input id="attendees" type="text" placeholder="예: 박영준, 김미소, 이한결"></label>
+        </div>
+
+        <section class="recorder" aria-label="회의 녹음">
+          <div class="recorder-head">
+            <div class="recorder-title"><span id="recordDot" class="record-dot"></span>회의 음성 녹음</div>
+            <div id="recordStatus" class="record-status">대기 · 00:00:00</div>
+          </div>
+          <div class="recorder-body">
+            <div class="record-mode" role="radiogroup" aria-label="녹음 방식">
+              <label><input type="radio" name="recordMode" value="meeting" checked><span>같은 공간 회의</span></label>
+              <label><input type="radio" name="recordMode" value="teams"><span>Teams 컨퍼런스콜</span></label>
+            </div>
+            <div id="modeGuide" class="mode-guide">이 컴퓨터의 마이크로 회의실 음성을 녹음합니다.</div>
+            <div class="record-controls">
+              <button id="recordStart" class="record-start" type="button">● 녹음 시작</button>
+              <button id="recordPause" class="record-pause" type="button" disabled>일시정지</button>
+              <button id="recordStop" class="record-stop" type="button" disabled>■ 녹음 종료·저장</button>
+            </div>
+            <label class="music-option"><input id="musicFilter" type="checkbox">배경음악 억제 강화 — 음악이 매우 클 때만 사용</label>
+            <div class="music-help">기본값은 목소리 보존 우선입니다. AI 정리 단계에서 노래 가사와 음악 소리를 회의 내용에서 제외합니다. 장시간 회의는 약 45분마다 자동 분할 저장됩니다.</div>
+            <div id="recovery" class="recovery" hidden>저장되지 못한 임시 녹음이 있습니다.<button id="recoverRecording" type="button">지금 복구 저장</button></div>
+            <div id="recordingList" class="recordings"></div>
+            <div class="import-row">
+              <label class="import-button">Teams 녹화 파일 불러오기<input id="recordingFile" type="file" accept=".mp3,.mp4,.m4a,.wav,.webm,audio/*,video/mp4"></label>
+              <span>기존 녹화 파일도 첨부해 원문 받아쓰기와 한국어 회의록을 만들 수 있습니다.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="ai-panel">
+          <div class="ai-row">
+            <div>
+              <div class="ai-title">무료 로컬 회의록 자동 작성</div>
+              <div id="aiCopy" class="ai-copy">한국어·영어 등 여러 언어를 시간별 원문으로 받아쓰고, 회의록은 한국어로 정리합니다.</div>
+              <div id="localStatus" class="local-status loading">로컬 모델 확인 중</div>
+            </div>
+            <button id="generateNotes" class="ai-button" type="button">녹음 듣고 회의록 작성</button>
+          </div>
+          <details id="transcriptDetails" class="transcript" hidden>
+            <summary>시간별 원문 받아쓰기 보기</summary>
+            <textarea id="transcript" readonly></textarea>
+          </details>
+        </section>
+
+        <div class="sections">
+          <label>회의 내용<textarea id="content" placeholder="핵심 논의, 결정 사항, 후속 업무를 한 번에 정리하세요"></textarea></label>
+        </div>
+        <div class="writing-guide">AI가 핵심 논의 · 결정 사항 · 후속 업무 순서로 한 본문 안에 정리합니다. Ctrl+S로도 저장할 수 있습니다.</div>
+      </section>
+    </div>
+  </main>
+  <div id="toast" class="toast" role="status"></div>
+  <script>
+    const noteList=document.getElementById("noteList");
+    const editorTitle=document.getElementById("editorTitle");
+    const deleteButton=document.getElementById("deleteNote");
+    const toast=document.getElementById("toast");
+    const recordingList=document.getElementById("recordingList");
+    const recordStart=document.getElementById("recordStart");
+    const recordPause=document.getElementById("recordPause");
+    const recordStop=document.getElementById("recordStop");
+    const recordStatus=document.getElementById("recordStatus");
+    const recordDot=document.getElementById("recordDot");
+    const recovery=document.getElementById("recovery");
+    const generateButton=document.getElementById("generateNotes");
+    const fields={
+      title:document.getElementById("title"),date:document.getElementById("meetingDate"),
+      attendees:document.getElementById("attendees"),content:document.getElementById("content")
+    };
+    let notes=[];let selectedId="";let localAiReady=false;let deleteArmed=false;
+    let aiPollTimer=null;const completedAiJobs=new Set();
+    let mediaRecorder=null;let mediaStream=null;let chunks=[];let recordStartedAt=0;
+    let captureStreams=[];let audioContext=null;let recordingSource="meeting";
+    let pausedStartedAt=0;let pausedTotal=0;let recordTimer=null;let rotateTimer=null;
+    let recordingActive=false;let rotating=false;let currentMime="audio/webm";let recordingWakeLock=null;
+    const localDate=()=>{const now=new Date(),pad=v=>String(v).padStart(2,"0");return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`};
+    const formatClock=seconds=>{seconds=Math.max(0,Math.floor(seconds));const h=String(Math.floor(seconds/3600)).padStart(2,"0"),m=String(Math.floor(seconds%3600/60)).padStart(2,"0"),s=String(seconds%60).padStart(2,"0");return `${h}:${m}:${s}`};
+    const currentNote=()=>notes.find(item=>item.id===selectedId);
+    function combinedMeetingContent(note){
+      const content=String(note?.content||"").trim(),parts=content?[content]:[];
+      const append=(heading,value)=>{
+        value=String(value||"").trim();
+        if(!value||["미정","없음"].includes(value)||content.includes(`${heading}\n`))return;
+        parts.push(`${heading}\n${value}`);
+      };
+      append("결정 사항",note?.decisions);
+      append("후속 업무",note?.actions);
+      return parts.join("\n\n");
+    }
+    function showToast(message){toast.textContent=message;toast.classList.add("show");clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.classList.remove("show"),3000)}
+    async function request(url,options){const response=await fetch(url,options),data=await response.json();if(!response.ok)throw new Error(data.error||"요청을 처리하지 못했습니다.");return data}
+    function formatDate(value){const parts=String(value).split("-");return parts.length===3?`${parts[0]}년 ${Number(parts[1])}월 ${Number(parts[2])}일`:value}
+    function formatSize(bytes){if(bytes<1024*1024)return `${Math.max(1,Math.round(bytes/1024))}KB`;return `${(bytes/1024/1024).toFixed(1)}MB`}
+    function renderList(){
+      noteList.replaceChildren();
+      if(!notes.length){const empty=document.createElement("div");empty.className="list-empty";empty.textContent="저장된 회의록이 없습니다.";noteList.append(empty);return}
+      notes.forEach(note=>{const item=document.createElement("button");item.type="button";item.className=`note-item${note.id===selectedId?" active":""}`;
+        const date=document.createElement("div");date.className="note-item-date";date.textContent=formatDate(note.date);
+        const title=document.createElement("div");title.className="note-item-title";title.textContent=note.title;
+        const meta=document.createElement("div");meta.className="note-item-meta";const count=(note.recordings||[]).length;meta.textContent=`${note.attendees?`참석자 · ${note.attendees}`:"참석자 미입력"}${count?` · 녹음 ${count}개`:""}`;
+        item.append(date,title,meta);item.addEventListener("click",()=>selectNote(note.id));noteList.append(item)});
+    }
+    function renderRecordings(){
+      recordingList.replaceChildren();const note=currentNote(),recordings=note?.recordings||[];
+      if(!recordings.length){const empty=document.createElement("div");empty.className="recording-empty";empty.textContent="아직 저장된 녹음이 없습니다.";recordingList.append(empty);return}
+      recordings.forEach((recording,index)=>{const item=document.createElement("div");item.className="recording-item";
+        const main=document.createElement("div");main.className="recording-main";const audio=document.createElement("audio");audio.controls=true;audio.preload="metadata";audio.src=`/api/meetings/recordings/${note.id}/${recording.id}`;
+        const meta=document.createElement("div");meta.className="recording-meta";const sourceLabel=recording.source==="teams"?"Teams 통화":recording.source==="import"?"불러온 파일":"회의 녹음";meta.textContent=`${sourceLabel} ${index+1} · ${formatClock(recording.duration_seconds||0)} · ${formatSize(recording.size||0)}${recording.transcript?" · 원문 받아쓰기 완료":""}`;
+        main.append(audio,meta);const actions=document.createElement("div");actions.className="recording-actions";
+        const download=document.createElement("a");download.href=audio.src;download.download=recording.filename||`회의녹음-${index+1}.webm`;download.textContent="다운로드";
+        const remove=document.createElement("button");remove.type="button";remove.textContent="삭제";remove.addEventListener("click",()=>deleteRecording(recording.id));
+        actions.append(download,remove);item.append(main,actions);recordingList.append(item)});
+    }
+    function selectNote(id){
+      if(recordingActive){showToast("녹음을 종료한 뒤 다른 회의록을 열어주세요.");return}
+      const note=notes.find(item=>item.id===id);if(!note)return;selectedId=id;Object.keys(fields).forEach(key=>fields[key].value=key==="content"?combinedMeetingContent(note):(note[key]||""));
+      editorTitle.textContent="회의록 편집";deleteButton.hidden=false;document.getElementById("transcript").value=note.transcript||"";
+      document.getElementById("transcriptDetails").hidden=!note.transcript;renderList();renderRecordings();checkAiJob(id);
+    }
+    function newNote(){
+      if(recordingActive){showToast("녹음을 종료한 뒤 새 회의록을 만들어주세요.");return}
+      selectedId="";Object.values(fields).forEach(field=>field.value="");fields.date.value=localDate();editorTitle.textContent="새 회의록 작성";
+      deleteButton.hidden=true;deleteButton.classList.remove("confirming");deleteButton.textContent="삭제";document.getElementById("transcriptDetails").hidden=true;
+      renderList();renderRecordings();fields.title.focus();
+    }
+    async function saveNote(){
+      const payload={action:"save",id:selectedId,decisions:"",actions:""};Object.keys(fields).forEach(key=>payload[key]=fields[key].value);
+      const button=document.getElementById("saveNote");button.disabled=true;
+      try{const result=await request("/api/meetings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+        const existing=notes.findIndex(item=>item.id===result.note.id);if(existing>=0)notes[existing]=result.note;else notes.push(result.note);
+        notes.sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.updated_at).localeCompare(String(a.updated_at)));
+        selectedId=result.note.id;selectNote(selectedId);showToast("회의록을 저장했습니다.");return result.note;
+      }catch(error){showToast(error.message);throw error}finally{button.disabled=false}
+    }
+    deleteButton.addEventListener("click",async()=>{if(!selectedId)return;if(!deleteArmed){deleteArmed=true;deleteButton.classList.add("confirming");deleteButton.textContent="정말 삭제";setTimeout(()=>{deleteArmed=false;deleteButton.classList.remove("confirming");deleteButton.textContent="삭제"},10000);return}
+      deleteButton.disabled=true;try{await request("/api/meetings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"delete",id:selectedId})});notes=notes.filter(item=>item.id!==selectedId);deleteArmed=false;newNote();showToast("회의록과 첨부 녹음을 삭제했습니다.")}catch(error){showToast(error.message)}finally{deleteButton.disabled=false}});
+    async function deleteRecording(recordingId){
+      if(!confirm("이 녹음 파일을 삭제할까요? 삭제하면 복구할 수 없습니다."))return;
+      try{await request("/api/meetings/recordings/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({note_id:selectedId,recording_id:recordingId})});
+        const note=currentNote();note.recordings=(note.recordings||[]).filter(item=>item.id!==recordingId);renderRecordings();renderList();showToast("녹음을 삭제했습니다.")}catch(error){showToast(error.message)}
+    }
+    function supportedMime(){return ["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus","audio/mp4"].find(type=>window.MediaRecorder?.isTypeSupported(type))||""}
+    async function keepComputerAwake(){try{if("wakeLock" in navigator&&!recordingWakeLock)recordingWakeLock=await navigator.wakeLock.request("screen")}catch{}}
+    async function releaseComputerAwake(){try{await recordingWakeLock?.release()}catch{}recordingWakeLock=null}
+    function updateRecordClock(){if(!recordingActive)return;let paused=pausedTotal;if(pausedStartedAt)paused+=Date.now()-pausedStartedAt;const elapsed=(Date.now()-recordStartedAt-paused)/1000;recordStatus.textContent=`${mediaRecorder?.state==="paused"?"일시정지":"녹음 중"} · ${formatClock(elapsed)}`}
+    async function startRecording(){
+      if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){showToast("이 브라우저에서는 음성 녹음을 사용할 수 없습니다.");return}
+      try{
+        if(!selectedId)await saveNote();else if(fields.title.value.trim()!==currentNote()?.title)await saveNote();
+        const strong=document.getElementById("musicFilter").checked;
+        recordingSource=document.querySelector('input[name="recordMode"]:checked').value;
+        captureStreams=[];
+        if(recordingSource==="teams"){
+          const displayStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true,systemAudio:"include"});
+          if(!displayStream.getAudioTracks().length){
+            displayStream.getTracks().forEach(track=>track.stop());
+            throw new Error("Teams 소리를 받으려면 공유 창에서 '시스템 오디오 공유'를 켜주세요.");
+          }
+          const microphoneStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:strong,autoGainControl:true,channelCount:1}});
+          captureStreams=[displayStream,microphoneStream];audioContext=new AudioContext();
+          const destination=audioContext.createMediaStreamDestination();
+          const systemSource=audioContext.createMediaStreamSource(new MediaStream(displayStream.getAudioTracks()));
+          const microphoneSource=audioContext.createMediaStreamSource(microphoneStream);
+          const systemGain=audioContext.createGain(),microphoneGain=audioContext.createGain();
+          systemGain.gain.value=.9;microphoneGain.gain.value=1.15;
+          systemSource.connect(systemGain).connect(destination);microphoneSource.connect(microphoneGain).connect(destination);
+          mediaStream=new MediaStream(destination.stream.getAudioTracks());
+          displayStream.getVideoTracks()[0].addEventListener("ended",()=>{if(recordingActive)stopRecording()},{once:true});
+        }else{
+          mediaStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:strong,autoGainControl:!strong,channelCount:1}});
+          captureStreams=[mediaStream];
+        }
+        recordingActive=true;recordStartedAt=Date.now();pausedStartedAt=0;pausedTotal=0;recordDot.classList.add("live");
+        keepComputerAwake();
+        recordStart.disabled=true;recordPause.disabled=false;recordStop.disabled=false;document.getElementById("musicFilter").disabled=true;
+        document.querySelectorAll('input[name="recordMode"]').forEach(input=>input.disabled=true);
+        startSegment();recordTimer=setInterval(updateRecordClock,500);updateRecordClock();
+      }catch(error){if(error.name==="NotAllowedError")showToast("마이크 사용을 허용해야 녹음할 수 있습니다.");else if(error.message)showToast(error.message)}
+    }
+    function startSegment(){
+      chunks=[];currentMime=supportedMime()||"audio/webm";mediaRecorder=new MediaRecorder(mediaStream,currentMime?{mimeType:currentMime,audioBitsPerSecond:48000}:{audioBitsPerSecond:48000});
+      currentMime=mediaRecorder.mimeType||currentMime;const segmentStarted=Date.now();prepareRecovery({noteId:selectedId,mimeType:currentMime,startedAt:segmentStarted,source:recordingSource});
+      mediaRecorder.ondataavailable=event=>{if(event.data?.size){chunks.push(event.data);storeRecoveryChunk(event.data)}};
+      mediaRecorder.onstop=async()=>{const duration=Math.round((Date.now()-segmentStarted)/1000),blob=new Blob(chunks,{type:currentMime});chunks=[];
+        try{await uploadRecording(blob,duration);await clearRecovery();if(rotating&&recordingActive){rotating=false;startSegment()}else if(!recordingActive){finishRecordingUi()}}
+        catch(error){rotating=false;recordingActive=false;finishRecordingUi();recovery.hidden=false;showToast(`녹음은 임시 보관했습니다. ${error.message}`)}};
+      mediaRecorder.start(5000);clearTimeout(rotateTimer);rotateTimer=setTimeout(()=>{if(recordingActive&&mediaRecorder.state!=="inactive"){rotating=true;mediaRecorder.stop()}},45*60*1000);
+    }
+    function togglePause(){if(!mediaRecorder)return;if(mediaRecorder.state==="recording"){mediaRecorder.pause();pausedStartedAt=Date.now();recordPause.textContent="녹음 계속"}else if(mediaRecorder.state==="paused"){mediaRecorder.resume();pausedTotal+=Date.now()-pausedStartedAt;pausedStartedAt=0;recordPause.textContent="일시정지"}updateRecordClock()}
+    function stopRecording(){if(!recordingActive)return;recordingActive=false;rotating=false;clearTimeout(rotateTimer);if(mediaRecorder?.state!=="inactive")mediaRecorder.stop()}
+    function finishRecordingUi(){clearInterval(recordTimer);clearTimeout(rotateTimer);releaseComputerAwake();captureStreams.forEach(stream=>stream.getTracks().forEach(track=>track.stop()));captureStreams=[];mediaStream?.getTracks().forEach(track=>track.stop());mediaStream=null;mediaRecorder=null;if(audioContext){audioContext.close();audioContext=null}recordDot.classList.remove("live");recordStatus.textContent="저장 완료 · 00:00:00";recordStart.disabled=false;recordPause.disabled=true;recordStop.disabled=true;recordPause.textContent="일시정지";document.getElementById("musicFilter").disabled=false;document.querySelectorAll('input[name="recordMode"]').forEach(input=>input.disabled=false)}
+    async function uploadRecording(blob,duration,source=recordingSource){
+      const response=await fetch(`/api/meetings/recordings?note_id=${encodeURIComponent(selectedId)}&duration=${duration}&source=${encodeURIComponent(source)}`,{method:"POST",headers:{"Content-Type":blob.type||"audio/webm"},body:blob});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||"녹음을 저장하지 못했습니다.");
+      const note=currentNote();note.recordings=note.recordings||[];note.recordings.push(data.recording);renderRecordings();renderList();showToast("녹음을 안전하게 저장했습니다.");
+    }
+    function openRecoveryDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open("toobus-meeting-recovery",1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains("meta"))db.createObjectStore("meta");if(!db.objectStoreNames.contains("chunks"))db.createObjectStore("chunks",{autoIncrement:true})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+    async function prepareRecovery(meta){try{const db=await openRecoveryDb(),tx=db.transaction(["meta","chunks"],"readwrite");tx.objectStore("chunks").clear();tx.objectStore("meta").put(meta,"active")}catch{}}
+    async function storeRecoveryChunk(blob){try{const db=await openRecoveryDb();db.transaction("chunks","readwrite").objectStore("chunks").add(blob)}catch{}}
+    async function clearRecovery(){try{const db=await openRecoveryDb(),tx=db.transaction(["meta","chunks"],"readwrite");tx.objectStore("meta").clear();tx.objectStore("chunks").clear();recovery.hidden=true}catch{}}
+    async function readRecovery(){try{const db=await openRecoveryDb();return await new Promise(resolve=>{const tx=db.transaction(["meta","chunks"]),metaReq=tx.objectStore("meta").get("active"),chunksReq=tx.objectStore("chunks").getAll();tx.oncomplete=()=>resolve({meta:metaReq.result,chunks:chunksReq.result||[]});tx.onerror=()=>resolve({})})}catch{return {}}}
+    async function checkRecovery(){const saved=await readRecovery();recovery.hidden=!(saved.meta&&saved.chunks?.length)}
+    async function recoverRecording(){
+      const saved=await readRecovery();if(!saved.meta||!saved.chunks?.length)return;
+      const note=notes.find(item=>item.id===saved.meta.noteId);if(!note){showToast("복구할 회의록을 찾을 수 없습니다.");return}
+      selectedId=note.id;selectNote(note.id);const blob=new Blob(saved.chunks,{type:saved.meta.mimeType||"audio/webm"});
+      try{await uploadRecording(blob,Math.round((Date.now()-saved.meta.startedAt)/1000),saved.meta.source||"meeting");await clearRecovery()}catch(error){showToast(error.message)}
+    }
+    async function importRecording(file){
+      if(!file)return;
+      if(file.size>1024*1024*1024){showToast("1GB 이하의 녹화 파일만 불러올 수 있습니다.");return}
+      try{
+        if(!selectedId)await saveNote();
+        const audio=document.createElement("audio"),duration=await new Promise(resolve=>{audio.preload="metadata";audio.onloadedmetadata=()=>{URL.revokeObjectURL(audio.src);resolve(Math.round(Number.isFinite(audio.duration)?audio.duration:0))};audio.onerror=()=>resolve(0);audio.src=URL.createObjectURL(file)});
+        showToast("녹화 파일을 저장하고 있습니다…");await uploadRecording(file,duration,"import");
+      }catch(error){showToast(error.message)}finally{document.getElementById("recordingFile").value=""}
+    }
+    async function loadAiStatus(){const status=document.getElementById("localStatus");try{const data=await request("/api/meetings/ai/status");localAiReady=!!data.configured;status.classList.toggle("loading",!localAiReady);status.textContent=localAiReady?"무료 · 오프라인 모델 준비 완료":"무료 모델을 처음 한 번 내려받는 중";document.getElementById("aiCopy").textContent=localAiReady?"백그라운드에서 처리되므로 작성 중에도 다른 업무를 할 수 있습니다.":"모델 준비가 끝나면 API 키나 사용료 없이 이 컴퓨터 안에서 처리됩니다."}catch{status.textContent="로컬 모델 상태 확인 실패"}}
+    function applyAiJob(job){
+      const running=["queued","running"].includes(job?.status),status=document.getElementById("localStatus");
+      generateButton.disabled=running;generateButton.textContent=running?"회의록 작성 중 · 다른 업무 가능":"녹음 듣고 회의록 작성";
+      if(running){status.classList.add("loading");status.textContent=job.message||"백그라운드 처리 중";document.getElementById("aiCopy").textContent="이 화면을 닫거나 다른 업무 탭을 사용해도 작업은 계속됩니다."}
+      else if(job?.status==="failed"){status.classList.add("loading");status.textContent="회의록 작성 실패";document.getElementById("aiCopy").textContent=job.message||"처리 중 오류가 발생했습니다."}
+      else if(localAiReady){status.classList.remove("loading");status.textContent=job?.status==="completed"?"회의록 작성 완료":"무료 · 오프라인 모델 준비 완료";document.getElementById("aiCopy").textContent="백그라운드에서 처리되므로 작성 중에도 다른 업무를 할 수 있습니다."}
+      return running;
+    }
+    async function refreshNotesAfterAi(noteId){
+      const data=await request("/api/meetings");notes=data.notes||[];renderList();if(notes.some(item=>item.id===noteId)){selectedId=noteId;const note=currentNote();Object.keys(fields).forEach(key=>fields[key].value=key==="content"?combinedMeetingContent(note):(note[key]||""));document.getElementById("transcript").value=note.transcript||"";document.getElementById("transcriptDetails").hidden=!note.transcript;renderRecordings()}
+    }
+    async function checkAiJob(noteId=selectedId){
+      if(!noteId)return;
+      try{const job=await request(`/api/meetings/ai/job?note_id=${encodeURIComponent(noteId)}`),running=applyAiJob(job);
+        clearTimeout(aiPollTimer);
+        if(running)aiPollTimer=setTimeout(()=>checkAiJob(noteId),3000);
+        else if(job.status==="completed"&&!completedAiJobs.has(noteId)){completedAiJobs.add(noteId);await refreshNotesAfterAi(noteId);showToast("회의록 초안 작성이 완료되었습니다.")}
+      }catch(error){clearTimeout(aiPollTimer);showToast(error.message)}
+    }
+    async function generateNotes(){
+      if(!selectedId){showToast("회의록을 먼저 저장해주세요.");return}if(!(currentNote()?.recordings||[]).length){showToast("먼저 회의를 녹음해주세요.");return}if(!localAiReady){showToast("무료 로컬 모델을 준비 중입니다. 잠시 후 새로고침해주세요.");return}
+      generateButton.disabled=true;generateButton.textContent="백그라운드 작업 시작 중…";
+      try{const result=await request("/api/meetings/ai/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({note_id:selectedId})});completedAiJobs.delete(selectedId);applyAiJob(result.job);showToast("회의록 작성을 시작했습니다. 다른 업무를 계속하셔도 됩니다.");checkAiJob(selectedId)}
+      catch(error){showToast(error.message);generateButton.disabled=false;generateButton.textContent="녹음 듣고 회의록 작성"}
+    }
+    document.getElementById("newNote").addEventListener("click",newNote);document.getElementById("saveNote").addEventListener("click",()=>saveNote());
+    recordStart.addEventListener("click",startRecording);recordPause.addEventListener("click",togglePause);recordStop.addEventListener("click",stopRecording);
+    document.querySelectorAll('input[name="recordMode"]').forEach(input=>input.addEventListener("change",()=>{const teams=input.checked&&input.value==="teams";if(!input.checked)return;document.getElementById("modeGuide").textContent=teams?"Teams가 재생되는 화면을 선택하고 ‘시스템 오디오 공유’를 켜면, 상대방 음성과 내 마이크를 함께 녹음합니다. 헤드셋 사용을 권장합니다.":"이 컴퓨터의 마이크로 회의실 음성을 녹음합니다.";recordStart.textContent=teams?"● Teams 통화 녹음 시작":"● 녹음 시작"}));
+    document.getElementById("recordingFile").addEventListener("change",event=>importRecording(event.target.files?.[0]));
+    document.getElementById("recoverRecording").addEventListener("click",recoverRecording);generateButton.addEventListener("click",generateNotes);
+    document.querySelectorAll(".nav a:not(.active)").forEach(link=>link.addEventListener("click",event=>{if(!recordingActive)return;event.preventDefault();window.open(link.href,"toobus_parallel_work");showToast("녹음은 이 탭에서 계속되고, 선택한 업무를 별도 탭에 열었습니다.")}));
+    document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="s"){event.preventDefault();saveNote()}});
+    window.addEventListener("beforeunload",event=>{if(recordingActive){event.preventDefault();event.returnValue=""}});
+    document.addEventListener("visibilitychange",()=>{if(recordingActive&&document.visibilityState==="visible")keepComputerAwake()});
+    async function loadNotes(){try{const data=await request("/api/meetings");notes=data.notes||[];renderList();if(notes.length)selectNote(notes[0].id);else newNote()}catch(error){newNote();showToast(error.message)}}
+    Promise.all([loadNotes(),loadAiStatus(),checkRecovery()]);
+  </script>
+</body>
+</html>
+
+

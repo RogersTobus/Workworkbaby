@@ -1,0 +1,229 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>네이버 가격 최신화</title>
+  <style>
+    :root {
+      --ink: #16201c;
+      --green: #174f39;
+      --lime: #cde466;
+      --paper: #f3f6f3;
+      --card: #fff;
+      --muted: #6d7872;
+      --line: #dce4df;
+      --red: #be3e37;
+      --shadow: 0 18px 50px rgba(18,54,40,.1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--ink); background:
+        radial-gradient(circle at top left, rgba(205,228,102,.25), transparent 34rem),
+        var(--paper); font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+    }
+    main { width: min(1180px, calc(100% - 38px)); margin: 34px auto 60px; }
+    header { display:flex; justify-content:space-between; align-items:end; gap:24px; margin-bottom:20px; }
+    .eyebrow { color:var(--green); font-size:12px; font-weight:850; letter-spacing:.12em; }
+    h1 { margin:7px 0 0; font-size:clamp(28px,4vw,44px); letter-spacing:-.04em; }
+    .safe { padding:9px 13px; border:1px solid #b7c9bf; border-radius:999px; background:#ffffffb5; color:var(--green); font-size:13px; font-weight:750; }
+    .nav { display:flex; gap:8px; margin-bottom:18px; }
+    .nav a { padding:10px 15px; border:1px solid var(--line); border-radius:12px; color:var(--muted); background:#ffffffb8; text-decoration:none; font-size:13px; font-weight:800; }
+    .nav a.active { color:white; background:var(--ink); border-color:var(--ink); }
+    .layout { display:grid; grid-template-columns:.72fr 1.28fr; gap:18px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:22px; box-shadow:var(--shadow); }
+    .control { padding:24px; }
+    .label { color:var(--muted); font-size:12px; font-weight:800; }
+    .source { margin:7px 0 20px; font-weight:850; line-height:1.45; }
+    .rules { display:grid; gap:9px; margin:18px 0; }
+    .rule { padding:12px; border-radius:12px; background:#f4f8f5; font-size:13px; line-height:1.5; }
+    button { width:100%; border:0; border-radius:13px; padding:14px 16px; font-size:14px; font-weight:850; cursor:pointer; }
+    button:disabled { cursor:not-allowed; opacity:.48; }
+    .primary { color:white; background:var(--green); }
+    .resume { margin-top:9px; color:#263311; background:var(--lime); display:none; }
+    .stop { margin-top:9px; color:var(--green); background:white; border:1px solid #b9cbc1; }
+    .status { padding:24px; }
+    .status-head { display:flex; justify-content:space-between; gap:18px; align-items:start; }
+    .message { margin-top:6px; font-size:19px; font-weight:850; }
+    .badge { padding:7px 10px; border-radius:99px; background:#edf2ef; color:var(--green); font-size:12px; font-weight:850; white-space:nowrap; }
+    .progress { height:11px; margin:20px 0 14px; border-radius:99px; background:#e7ece9; overflow:hidden; }
+    .progress div { height:100%; width:0; background:var(--lime); transition:width .25s; }
+    .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .kpi { padding:13px; border-radius:12px; background:#f4f7f5; }
+    .kpi b { display:block; margin-top:5px; font-size:23px; }
+    .current { min-height:48px; margin-top:15px; padding:13px; border-left:4px solid var(--lime); background:#f6f8f6; border-radius:10px; font-size:13px; line-height:1.5; }
+    .results { grid-column:1/-1; overflow:hidden; }
+    .results-head { display:flex; justify-content:space-between; align-items:center; padding:20px 22px 12px; }
+    .results-head a { color:var(--green); font-size:13px; font-weight:800; }
+    .table-wrap { max-height:480px; overflow:auto; border-top:1px solid var(--line); }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th { position:sticky; top:0; z-index:1; padding:11px 10px; background:#eff4f1; color:#56635c; text-align:left; }
+    td { padding:10px; border-top:1px solid #edf0ee; vertical-align:top; }
+    td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .ok { color:var(--green); font-weight:800; }
+    .error { color:var(--red); font-weight:800; }
+    .empty { padding:34px; color:var(--muted); text-align:center; }
+    .note { margin-top:13px; color:var(--muted); font-size:12px; line-height:1.55; }
+    @media (max-width:850px) {
+      .layout { grid-template-columns:1fr; }
+      .kpis { grid-template-columns:1fr 1fr; }
+      header { align-items:start; flex-direction:column; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <div class="eyebrow">TOBUS · PRICE OPERATIONS</div>
+        <h1>네이버 가격 최신화</h1>
+      </div>
+      <div class="safe">확인 완료 후 Google Sheet에 일괄 반영</div>
+    </header>
+    <nav class="nav" aria-label="업무 메뉴">
+      <a href="/brand-connecting">브랜드 커넥팅</a>
+      <a href="/">Instagram DM</a>
+      <a class="active" href="/prices">네이버 가격 최신화</a>
+      <a href="/simulation">시뮬레이션</a>
+      <a href="/calendar">업무 캘린더</a>
+      <a href="/meetings">회의록</a>
+      <a href="/memos">메모</a>
+      <a href="/sales-email">영업메일</a>
+  </nav>
+
+    <div class="layout">
+      <section class="card control">
+        <div class="label">대상 Google Sheet</div>
+        <div class="source">Rogers Master sheets<br>임시 시뮬레이션&amp;상품정보 · 4~52행</div>
+        <div class="rules">
+          <div class="rule"><b>AE</b> 네이버 링크 전체 49개 확인</div>
+          <div class="rule"><b>X</b> 상품 가격·즉시 할인가</div>
+          <div class="rule"><b>Y</b> 최대혜택가, 없으면 X와 동일</div>
+          <div class="rule"><b>오류</b> 기존 X·Y 가격 유지</div>
+        </div>
+        <button id="start" class="primary">49개 가격 최신화 시작</button>
+        <button id="resume" class="resume">로그인 완료 · 계속</button>
+        <button id="stop" class="stop">작업 중지</button>
+        <div class="note">
+          첫 실행에는 앱 폴더의 <b>google_credentials.json</b>이 필요합니다.
+          Google 또는 네이버 로그인이 필요하면 작업이 멈추고 안내합니다.
+        </div>
+      </section>
+
+      <section class="card status">
+        <div class="status-head">
+          <div>
+            <div class="label">현재 상태</div>
+            <div id="message" class="message">상태를 불러오는 중입니다.</div>
+          </div>
+          <span id="badge" class="badge">IDLE</span>
+        </div>
+        <div class="progress"><div id="bar"></div></div>
+        <div class="kpis">
+          <div class="kpi"><span class="label">처리</span><b id="processed">0 / 0</b></div>
+          <div class="kpi"><span class="label">변경</span><b id="updated">0</b></div>
+          <div class="kpi"><span class="label">오류</span><b id="errors">0</b></div>
+          <div class="kpi"><span class="label">최근 시트 반영</span><b id="written">없음</b></div>
+        </div>
+        <div id="current" class="current">대기 중</div>
+      </section>
+
+      <section class="card results">
+        <div class="results-head">
+          <b>상품별 확인 결과</b>
+          <a href="https://docs.google.com/spreadsheets/d/1aP2_Hl0qZMB2Y3ORJz-aRxBF0yTTd6V57DCU76ClcWE/edit?gid=784167873#gid=784167873" target="_blank" rel="noopener">Google Sheet 열기</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>행</th><th>상품</th><th>기존 X</th><th>기존 Y</th><th>새 X</th><th>새 Y</th><th>상태</th><th>확인 일시</th></tr>
+            </thead>
+            <tbody id="rows"><tr><td class="empty" colspan="8">아직 확인한 상품이 없습니다.</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const runningStatuses = new Set([
+      "starting", "google_login_required", "opening_browser",
+      "naver_login_required", "naver_security_required",
+      "naver_security_restarting", "crawling", "writing"
+    ]);
+    const money = (value) => value == null ? "-" : Number(value).toLocaleString("ko-KR") + "원";
+
+    function render(data) {
+      $("message").textContent = data.message || "대기 중";
+      $("badge").textContent = String(data.status || "idle").toUpperCase();
+      $("processed").textContent = `${data.processed || 0} / ${data.total || 0}`;
+      $("updated").textContent = data.updated || 0;
+      $("errors").textContent = data.errors || 0;
+      $("written").textContent = data.last_updated_at || "없음";
+      $("bar").style.width = `${data.total ? Math.min(100, data.processed / data.total * 100) : 0}%`;
+      $("current").textContent = data.current_row
+        ? `${data.current_row}행 · ${data.current_product || ""}`
+        : (data.status === "completed" ? "전체 작업 완료" : "대기 중");
+      $("start").disabled = runningStatuses.has(data.status);
+      const needsResume = data.status === "naver_login_required"
+        || data.status === "naver_security_required";
+      $("resume").style.display = needsResume ? "block" : "none";
+      $("resume").textContent = data.status === "naver_security_required"
+        ? "브라우저 다시 열고 계속"
+        : "로그인 완료 · 계속";
+      $("stop").disabled = !runningStatuses.has(data.status);
+
+      const results = data.results || [];
+      $("rows").innerHTML = results.length ? results.map((item) => `
+        <tr>
+          <td>${item.row}</td>
+          <td>${escapeHtml(item.product || "")}</td>
+          <td class="num">${money(item.old_instant)}</td>
+          <td class="num">${money(item.old_best)}</td>
+          <td class="num">${money(item.instant)}</td>
+          <td class="num">${money(item.best)}</td>
+          <td class="${item.status === "ready" ? "ok" : "error"}">
+            ${item.status === "ready" ? (item.changed ? "변경" : "동일") : escapeHtml(item.error || "오류")}
+          </td>
+          <td>${escapeHtml(item.checked_at || "-")}</td>
+        </tr>`).join("")
+        : '<tr><td class="empty" colspan="8">아직 확인한 상품이 없습니다.</td></tr>';
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      })[char]);
+    }
+
+    async function post(path) {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: "{}"
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "요청에 실패했습니다.");
+      render(data);
+    }
+
+    async function poll() {
+      try {
+        const response = await fetch("/api/prices/status", {cache: "no-store"});
+        render(await response.json());
+      } catch (error) {
+        $("message").textContent = error.message;
+      }
+    }
+
+    $("start").addEventListener("click", () => post("/api/prices/start"));
+    $("resume").addEventListener("click", () => post("/api/prices/resume"));
+    $("stop").addEventListener("click", () => post("/api/prices/stop"));
+    poll();
+    setInterval(poll, 1000);
+  </script>
+</body>
+</html>
+
+

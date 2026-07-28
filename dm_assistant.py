@@ -459,7 +459,7 @@ def create_outlook_draft(payload: dict) -> dict:
             subtype=sub_type,
             filename=file_path.name,
         )
-    eml_path = temporary_dir / f"TOOBUS_{uuid4().hex}.eml"
+    eml_path = temporary_dir / f"TOBUS_{uuid4().hex}.eml"
     eml_path.write_bytes(message.as_bytes())
     if not OUTLOOK_POPUP_SCRIPT_PATH.is_file():
         raise ValueError("Outlook 팝업 실행 파일을 찾을 수 없습니다.")
@@ -2027,14 +2027,14 @@ def download_dm_workbook(temporary: Path, download_url: str) -> str:
 
     head_request = urllib.request.Request(
         download_url,
-        headers={"User-Agent": "ToobusWorkMaster/1.0"},
+        headers={"User-Agent": "TobusWorkMaster/1.0"},
         method="HEAD",
     )
     with urllib.request.urlopen(head_request, timeout=30) as response:
         remote_modified = response.headers.get("Last-Modified", "")
     download_request = urllib.request.Request(
         download_url,
-        headers={"User-Agent": "ToobusWorkMaster/1.0"},
+        headers={"User-Agent": "TobusWorkMaster/1.0"},
     )
     with urllib.request.urlopen(download_request, timeout=60) as response:
         content_length = int(response.headers.get("Content-Length", "0") or 0)

@@ -1,0 +1,107 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>플랫폼 메모</title>
+  <style>
+    :root{--ink:#142036;--muted:#6e7a91;--line:#dbe2ec;--panel:#fff;--bg:#f3f6fb;--navy:#17243d;--green:#176149;--soft:#eef7f3;--danger:#c84c4c}
+    *{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#f7f9fd,#eef3f8);color:var(--ink);font-family:Pretendard,"Noto Sans KR",Arial,sans-serif}
+    main{max-width:1320px;margin:0 auto;padding:36px 30px 60px}
+    header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:22px}
+    .eyebrow{font-size:13px;font-weight:900;letter-spacing:.13em;color:var(--green)}
+    h1{margin:8px 0 0;font-size:40px;line-height:1.1}.safe{color:var(--muted);font-size:14px}
+    .nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}.nav a{padding:11px 16px;border:1px solid #d5dde8;border-radius:13px;background:rgba(255,255,255,.72);color:#657087;text-decoration:none;font-weight:800;font-size:14px}.nav a.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+    .layout{display:grid;grid-template-columns:380px minmax(0,1fr);gap:18px;align-items:start}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:22px;box-shadow:0 18px 42px rgba(28,44,70,.08)}
+    .editor{padding:24px;position:sticky;top:18px}.editor-top,.library-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    h2{margin:0;font-size:23px}.sub{margin:7px 0 20px;color:var(--muted);font-size:14px;line-height:1.55}
+    label{display:block;margin:15px 0 7px;font-size:13px;font-weight:900;color:#536077}
+    input,textarea,button{font:inherit}input,textarea{width:100%;border:1px solid #ced8e4;border-radius:13px;background:#fbfcfe;color:var(--ink);padding:13px 14px;outline:none}input:focus,textarea:focus{border-color:#4e799f;box-shadow:0 0 0 3px rgba(78,121,159,.12)}
+    textarea{min-height:310px;resize:vertical;line-height:1.65}
+    button{border:0;border-radius:12px;padding:12px 16px;font-weight:900;cursor:pointer}.primary{width:100%;margin-top:16px;background:var(--green);color:#fff}.secondary{background:#edf1f6;color:#526078}.danger{margin-top:8px;width:100%;background:#fff0f0;color:var(--danger);display:none}.danger.show{display:block}
+    .library{padding:24px;min-height:600px}.search-wrap{position:relative;margin:18px 0}.search-wrap input{padding-left:42px}.search-icon{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:#8490a3}
+    .count{font-size:13px;font-weight:900;color:var(--muted);white-space:nowrap}.memo-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .memo-item{border:1px solid #dce4ed;background:#fbfcfe;border-radius:16px;padding:17px;text-align:left;min-height:150px;transition:.16s ease}.memo-item:hover{transform:translateY(-2px);border-color:#9db7ab;box-shadow:0 10px 22px rgba(24,60,48,.08)}.memo-item.active{border-color:var(--green);background:var(--soft);box-shadow:inset 0 0 0 1px var(--green)}
+    .platform{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:950;margin-bottom:10px}.platform:before{content:"";width:8px;height:8px;border-radius:50%;background:#54a884;flex:0 0 auto}
+    .preview{color:#526078;font-size:14px;line-height:1.55;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.date{margin-top:13px;color:#929cac;font-size:12px}
+    .empty{grid-column:1/-1;border:1px dashed #ccd6e2;border-radius:16px;padding:70px 20px;text-align:center;color:#8994a7;background:#fafbfd}
+    .toast{position:fixed;right:24px;bottom:24px;background:#17243d;color:#fff;border-radius:13px;padding:13px 17px;font-weight:800;opacity:0;transform:translateY(10px);pointer-events:none;transition:.2s}.toast.show{opacity:1;transform:none}
+    @media(max-width:900px){main{padding:24px 16px 45px}header{align-items:flex-start;flex-direction:column}h1{font-size:34px}.layout{grid-template-columns:1fr}.editor{position:static}.memo-list{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><div class="eyebrow">TOBUS · PLATFORM MEMO</div><h1>플랫폼 메모</h1></div>
+    <div class="safe">플랫폼별로 흩어진 정보를 기록하고 필요할 때 바로 검색합니다</div>
+  </header>
+  <nav class="nav" aria-label="업무 메뉴">
+    <a href="/brand-connecting">브랜드 커넥팅</a>
+    <a href="/">Instagram DM</a>
+    <a href="/prices">네이버 가격 최신화</a>
+    <a href="/simulation">시뮬레이션</a>
+    <a href="/calendar">업무 캘린더</a>
+    <a href="/meetings">회의록</a>
+    <a class="active" href="/memos">메모</a>
+    <a href="/sales-email">영업메일</a>
+  </nav>
+  <div class="layout">
+    <section class="card editor">
+      <div class="editor-top">
+        <h2 id="editorTitle">새 메모</h2>
+        <button class="secondary" id="newMemo" type="button">+ 새 메모</button>
+      </div>
+      <p class="sub">플랫폼명을 먼저 적고 관련 정보나 주의사항을 자유롭게 남겨주세요.</p>
+      <label for="platform">플랫폼명</label>
+      <input id="platform" maxlength="100" placeholder="예: 네이버, 베네피아, 현대H몰">
+      <label for="memo">메모</label>
+      <textarea id="memo" maxlength="5000" placeholder="담당자, 운영 방식, 수수료, 주의사항 등 나중에 다시 찾을 내용을 적어주세요."></textarea>
+      <button class="primary" id="saveMemo" type="button">메모 저장</button>
+      <button class="danger" id="deleteMemo" type="button">이 메모 삭제</button>
+    </section>
+    <section class="card library">
+      <div class="library-top"><div><h2>저장된 메모</h2><p class="sub" style="margin-bottom:0">최근 수정한 메모부터 표시됩니다.</p></div><span class="count" id="memoCount">0개</span></div>
+      <div class="search-wrap"><span class="search-icon">⌕</span><input id="search" type="search" placeholder="플랫폼명 또는 메모 내용 검색"></div>
+      <div class="memo-list" id="memoList"></div>
+    </section>
+  </div>
+</main>
+<div class="toast" id="toast" role="status"></div>
+<script>
+  let memos=[],selectedId="";
+  const platform=document.getElementById("platform"),memo=document.getElementById("memo"),list=document.getElementById("memoList"),search=document.getElementById("search"),deleteButton=document.getElementById("deleteMemo");
+  const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+  function showToast(message){const toast=document.getElementById("toast");toast.textContent=message;toast.classList.add("show");clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.classList.remove("show"),2600)}
+  async function request(url,options){const response=await fetch(url,options);const data=await response.json();if(!response.ok)throw new Error(data.error||"처리하지 못했습니다.");return data}
+  function formatDate(value){if(!value)return"";const parsed=new Date(value);return Number.isNaN(parsed.getTime())?value:new Intl.DateTimeFormat("ko-KR",{year:"numeric",month:"long",day:"numeric",hour:"2-digit",minute:"2-digit"}).format(parsed)}
+  function filteredMemos(){const keyword=search.value.trim().toLocaleLowerCase("ko");if(!keyword)return memos;return memos.filter(item=>`${item.platform} ${item.memo}`.toLocaleLowerCase("ko").includes(keyword))}
+  function render(){
+    const filtered=filteredMemos();document.getElementById("memoCount").textContent=`${filtered.length}개`;list.replaceChildren();
+    if(!filtered.length){const empty=document.createElement("div");empty.className="empty";empty.textContent=search.value.trim()?"검색 결과가 없습니다.":"아직 저장된 메모가 없습니다.";list.append(empty);return}
+    filtered.forEach(item=>{const button=document.createElement("button");button.type="button";button.className=`memo-item${item.id===selectedId?" active":""}`;
+      button.innerHTML=`<div class="platform">${escapeHtml(item.platform)}</div><div class="preview">${escapeHtml(item.memo)}</div><div class="date">수정 ${escapeHtml(formatDate(item.updated_at))}</div>`;
+      button.addEventListener("click",()=>selectMemo(item.id));list.append(button)});
+  }
+  function newMemo(){selectedId="";platform.value="";memo.value="";document.getElementById("editorTitle").textContent="새 메모";deleteButton.classList.remove("show");render();platform.focus()}
+  function selectMemo(id){const item=memos.find(entry=>entry.id===id);if(!item)return;selectedId=id;platform.value=item.platform||"";memo.value=item.memo||"";document.getElementById("editorTitle").textContent="메모 수정";deleteButton.classList.add("show");render();window.scrollTo({top:0,behavior:"smooth"})}
+  async function saveMemo(){
+    const button=document.getElementById("saveMemo");button.disabled=true;
+    try{const result=await request("/api/memos",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"save",id:selectedId,platform:platform.value,memo:memo.value})});
+      const index=memos.findIndex(item=>item.id===result.memo.id);if(index>=0)memos[index]=result.memo;else memos.push(result.memo);
+      memos.sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));selectedId=result.memo.id;selectMemo(selectedId);showToast("메모를 저장했습니다.");
+    }catch(error){showToast(error.message)}finally{button.disabled=false}
+  }
+  async function deleteMemo(){
+    if(!selectedId||!confirm("이 메모를 삭제할까요?"))return;deleteButton.disabled=true;
+    try{await request("/api/memos",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"delete",id:selectedId})});memos=memos.filter(item=>item.id!==selectedId);newMemo();showToast("메모를 삭제했습니다.")}
+    catch(error){showToast(error.message)}finally{deleteButton.disabled=false}
+  }
+  document.getElementById("newMemo").addEventListener("click",newMemo);document.getElementById("saveMemo").addEventListener("click",saveMemo);deleteButton.addEventListener("click",deleteMemo);search.addEventListener("input",render);
+  document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="s"){event.preventDefault();saveMemo()}});
+  (async()=>{try{const data=await request("/api/memos");memos=data.memos||[];render()}catch(error){showToast(error.message)}})();
+</script>
+</body>
+</html>
+
+
