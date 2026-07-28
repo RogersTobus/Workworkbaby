@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>브랜드 커넥팅</title>
+  <style>
+    :root{
+      --ink:#17211d;--muted:#68746e;--paper:#f4f7f4;--card:#fff;
+      --green:#174f39;--lime:#cde466;--line:#dce4df;
+      --shadow:0 18px 50px rgba(18,54,40,.10)
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;color:var(--ink);font-family:"Segoe UI","Malgun Gothic",sans-serif;
+      background:radial-gradient(circle at top left,rgba(205,228,102,.28),transparent 34rem),var(--paper)
+    }
+    body[data-brand="gaia"]{
+      --green:#4d5a24;--lime:#d8c56a;--paper:#f7f5ec;--line:#e3dfca;
+      --shadow:0 18px 50px rgba(77,90,36,.11)
+    }
+    main{width:min(1120px,calc(100% - 40px));margin:34px auto 60px}
+    header{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:22px}
+    .eyebrow{color:var(--green);font-weight:800;letter-spacing:.12em;font-size:12px}
+    h1{margin:7px 0 0;font-size:clamp(28px,4vw,44px);letter-spacing:-.04em}
+    .phase{border:1px solid #b7c9bf;border-radius:999px;padding:9px 13px;background:rgba(255,255,255,.7);color:var(--green);font-size:13px;font-weight:700}
+    .nav{display:flex;gap:8px;margin:0 0 18px;overflow-x:auto;padding-bottom:2px}
+    .nav a{flex:0 0 auto;padding:10px 15px;border:1px solid var(--line);border-radius:12px;color:var(--muted);background:rgba(255,255,255,.72);text-decoration:none;font-size:13px;font-weight:800}
+    .nav a.active{color:#fff;background:var(--ink);border-color:var(--ink)}
+    .brand-switch{display:inline-flex;gap:7px;padding:5px;margin-bottom:18px;background:rgba(255,255,255,.78);border:1px solid var(--line);border-radius:14px}
+    button{border:0;border-radius:11px;padding:11px 22px;cursor:pointer;font:800 14px "Segoe UI","Malgun Gothic",sans-serif}
+    .brand-switch button{min-width:120px;color:var(--muted);background:transparent}
+    .brand-switch button.active{color:#fff;background:var(--green)}
+    .workspace{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);overflow:hidden}
+    .workspace-head{display:flex;justify-content:space-between;gap:18px;padding:26px 28px;border-bottom:1px solid var(--line)}
+    .workspace-head h2{margin:0 0 7px;font-size:25px}
+    .workspace-head p{margin:0;color:var(--muted);font-size:14px}
+    .brand-mark{align-self:center;padding:9px 13px;border-radius:10px;background:color-mix(in srgb,var(--lime) 30%,white);color:var(--green);font-weight:900}
+    .workspace-body{min-height:300px;padding:24px 28px 28px}
+    .crawl-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .field label{display:block;margin:0 0 7px;color:#536158;font-size:12px;font-weight:850}
+    .field select,.field input{width:100%;height:46px;border:1px solid #cfd9d2;border-radius:12px;background:#fbfcfb;padding:0 13px;color:var(--ink);font:700 14px "Segoe UI","Malgun Gothic",sans-serif;outline:none}
+    .field select:focus,.field input:focus{border-color:#76a68b;box-shadow:0 0 0 3px rgba(23,89,64,.10)}
+    .filter-summary{margin:15px 0;padding:14px 16px;border-radius:13px;background:#f5f8f6;color:#59675f;font-size:13px;line-height:1.65}
+    .filter-summary strong{color:var(--green)}
+    .crawl-actions{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:9px}
+    .start-button{color:#fff;background:var(--green)}
+    .resume-button{color:#263311;background:var(--lime)}
+    .stop-button{color:var(--green);background:#fff;border:1px solid #b9cbc1}
+    .crawl-actions button:disabled{cursor:not-allowed;opacity:.45}
+    .status-card{margin-top:17px;padding:17px;border:1px solid var(--line);border-radius:15px;background:#fbfcfb}
+    .status-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .status-message{font-size:13px;font-weight:750;line-height:1.55}
+    .status-badge{flex:0 0 auto;padding:6px 9px;border-radius:99px;background:#edf2ef;color:var(--green);font-size:11px;font-weight:850}
+    .progress{height:10px;margin:14px 0 11px;border-radius:99px;background:#e7ece9;overflow:hidden}
+    .progress div{height:100%;width:0;background:var(--lime);transition:width .25s}
+    .status-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;color:var(--muted);font-size:12px}
+    .status-meta div{padding:10px;border-radius:10px;background:#f0f4f2}
+    .status-meta b{display:block;margin-top:4px;color:var(--ink);font-size:15px}
+    .background-note{margin:14px 0 0;color:var(--muted);font-size:12px;line-height:1.55}
+    .section-divider{height:1px;margin:28px 0;background:var(--line)}
+    .favorite-head{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:16px}
+    .favorite-head h3{margin:0 0 6px;font-size:21px}
+    .favorite-head p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+    .favorite-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .favorite-actions{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:9px}
+    .favorite-start{color:#fff;background:var(--green)}
+    .favorite-resume{color:#263311;background:var(--lime)}
+    .favorite-stop{color:var(--green);background:#fff;border:1px solid #b9cbc1}
+    .favorite-actions button:disabled{cursor:not-allowed;opacity:.45}
+    .campaign-list{display:grid;gap:10px;margin-bottom:11px}
+    .campaign-row{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(180px,.7fr) 46px;gap:9px;align-items:center}
+    .campaign-row input,.campaign-row select{width:100%;height:46px;border:1px solid #cfd9d2;border-radius:12px;background:#fbfcfb;padding:0 13px;color:var(--ink);font:700 14px "Segoe UI","Malgun Gothic",sans-serif;outline:none}
+    .campaign-row input:focus,.campaign-row select:focus{border-color:#76a68b;box-shadow:0 0 0 3px rgba(23,89,64,.10)}
+    .remove-campaign{height:46px;padding:0;color:#9c4b4b;background:#fff1f1;border:1px solid #f0cece}
+    .add-campaign{margin-bottom:14px;color:var(--green);background:#fff;border:1px solid #b9cbc1}
+    .proposal-actions{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:9px}
+    .proposal-start{color:#fff;background:var(--green)}
+    .proposal-resume{color:#263311;background:var(--lime)}
+    .proposal-stop{color:var(--green);background:#fff;border:1px solid #b9cbc1}
+    .proposal-actions button:disabled,.add-campaign:disabled,.remove-campaign:disabled{cursor:not-allowed;opacity:.45}
+    .error-list{margin:10px 0 0;padding-left:18px;color:#9c4b4b;font-size:12px;line-height:1.55}
+    @media(max-width:760px){header{align-items:start;flex-direction:column}.workspace-head,.favorite-head{align-items:start;flex-direction:column}.crawl-grid,.crawl-actions,.favorite-grid,.favorite-actions,.proposal-actions,.campaign-row{grid-template-columns:1fr}.status-meta{grid-template-columns:1fr}.remove-campaign{width:100%}}
+  </style>
+</head>
+<body data-brand="alp">
+  <main>
+    <header>
+      <div>
+        <div class="eyebrow">BRAND CONNECTING</div>
+        <h1>브랜드 커넥팅</h1>
+      </div>
+      <div class="phase">1단계 · 크롤링 자동화</div>
+    </header>
+    <nav class="nav" aria-label="업무 메뉴">
+      <a class="active" href="/brand-connecting">브랜드 커넥팅</a>
+      <a href="/">Instagram DM</a>
+      <a href="/prices">네이버 가격 최신화</a>
+      <a href="/simulation">시뮬레이션</a>
+      <a href="/calendar">업무 캘린더</a>
+      <a href="/meetings">회의록</a>
+      <a href="/memos">메모</a>
+      <a href="/sales-email">영업메일</a>
+    </nav>
+    <div class="brand-switch" aria-label="브랜드 선택">
+      <button type="button" data-brand="alp">ALP</button>
+      <button type="button" data-brand="gaia">GAEA</button>
+    </div>
+    <section class="workspace">
+      <div class="workspace-head">
+        <div>
+          <h2 id="workspaceTitle">알프 브랜드 커넥팅</h2>
+          <p>위 세부 탭에서 선택한 브랜드의 업무만 이곳에 표시됩니다.</p>
+        </div>
+        <div id="brandMark" class="brand-mark">ALP</div>
+      </div>
+      <div class="workspace-body">
+        <div class="crawl-grid">
+          <div class="field">
+            <label for="crawlSource">크롤링 대상</label>
+            <select id="crawlSource">
+              <option value="both">블로그 + 인스타그램</option>
+              <option value="blog">블로그만</option>
+              <option value="instagram">인스타그램만</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="crawlCount">추가할 새 인원 수 · 최대 200명</label>
+            <input id="crawlCount" type="number" min="1" max="200" value="100">
+          </div>
+        </div>
+        <div id="filterSummary" class="filter-summary"></div>
+        <div class="crawl-actions">
+          <button id="startCrawl" class="start-button" type="button">크롤링 시작</button>
+          <button id="resumeCrawl" class="resume-button" type="button" hidden>로그인 완료·계속</button>
+          <button id="stopCrawl" class="stop-button" type="button" disabled>중단</button>
+        </div>
+        <div class="status-card">
+          <div class="status-top">
+            <div id="statusMessage" class="status-message">크롤링 대기 중</div>
+            <div id="statusBadge" class="status-badge">대기</div>
+          </div>
+          <div class="progress"><div id="crawlProgress"></div></div>
+          <div class="status-meta">
+            <div>수집 완료<b id="collectedCount">0명</b></div>
+            <div>시트 추가<b id="addedCount">0명</b></div>
+            <div>중복 제외<b id="duplicateCount">0명</b></div>
+          </div>
+          <p class="background-note">크롤링은 Chrome 디버깅 창에서 백그라운드로 진행됩니다. 실행 중에도 캘린더, 회의록 등 다른 업무를 계속할 수 있습니다.</p>
+        </div>
+        <div class="section-divider"></div>
+        <section aria-labelledby="favoriteTitle">
+          <div class="favorite-head">
+            <div>
+              <h3 id="favoriteTitle">크리에이터 찜 자동화</h3>
+              <p>선택한 상품 열이 빈칸인 사람부터 검색해 오늘 날짜의 찜 그룹에 자동으로 추가합니다.</p>
+            </div>
+          </div>
+          <div class="favorite-grid">
+            <div class="field">
+              <label for="favoritePlatform">채널</label>
+              <select id="favoritePlatform">
+                <option value="blog">블로그</option>
+                <option value="instagram">인스타그램</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="favoriteProduct">상품별 찜 후보</label>
+              <select id="favoriteProduct"></select>
+            </div>
+            <div class="field">
+              <label for="favoriteCount">찜 인원</label>
+              <select id="favoriteCount">
+                <option value="10">10명</option>
+                <option value="20">20명</option>
+                <option value="30">30명</option>
+                <option value="40">40명</option>
+                <option value="50">50명</option>
+              </select>
+            </div>
+          </div>
+          <div id="favoriteSummary" class="filter-summary"></div>
+          <div class="favorite-actions">
+            <button id="startFavorite" class="favorite-start" type="button">찜 자동화 시작</button>
+            <button id="resumeFavorite" class="favorite-resume" type="button" hidden>로그인 완료·계속</button>
+            <button id="stopFavorite" class="favorite-stop" type="button" disabled>중단</button>
+          </div>
+          <div class="status-card">
+            <div class="status-top">
+              <div id="favoriteStatusMessage" class="status-message">찜 자동화 대기 중</div>
+              <div id="favoriteStatusBadge" class="status-badge">대기</div>
+            </div>
+            <div class="progress"><div id="favoriteProgress"></div></div>
+            <div class="status-meta">
+              <div>찜 완료<b id="favoriteProcessed">0명</b></div>
+              <div>시트 표시<b id="favoriteMarked">0명</b></div>
+              <div>검색 실패<b id="favoriteFailed">0명</b></div>
+            </div>
+            <p id="favoriteGroupNote" class="background-note"></p>
+          </div>
+        </section>
+        <div class="section-divider"></div>
+        <section aria-labelledby="proposalTitle">
+          <div class="favorite-head">
+            <div>
+              <h3 id="proposalTitle">캠페인 제안 결과 확인</h3>
+              <p>진행 현황 링크와 상품을 등록하면 제안 상태와 제출 콘텐츠 링크를 최신 시트에 반영합니다.</p>
+            </div>
+          </div>
+          <div id="campaignList" class="campaign-list"></div>
+          <button id="addCampaign" class="add-campaign" type="button">＋ 캠페인 행 추가</button>
+          <div id="proposalSummary" class="filter-summary"></div>
+          <div class="proposal-actions">
+            <button id="startProposal" class="proposal-start" type="button">제안 확인</button>
+            <button id="resumeProposal" class="proposal-resume" type="button" hidden>로그인 완료·계속</button>
+            <button id="stopProposal" class="proposal-stop" type="button" disabled>중단</button>
+          </div>
+          <div class="status-card">
+            <div class="status-top">
+              <div id="proposalStatusMessage" class="status-message">제안 결과 확인 대기 중</div>
+              <div id="proposalStatusBadge" class="status-badge">대기</div>
+            </div>
+            <div class="progress"><div id="proposalProgress"></div></div>
+            <div class="status-meta">
+              <div>확인 인원<b id="proposalCreators">0명</b></div>
+              <div>시트 반영<b id="proposalUpdated">0건</b></div>
+              <div>콘텐츠 링크<b id="proposalLinks">0건</b></div>
+            </div>
+            <p id="proposalNote" class="background-note">실행 직전 최신 Google Drive 원본을 읽습니다.</p>
+            <ul id="proposalErrors" class="error-list" hidden></ul>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <script>
+    const brands={
+      alp:{label:"알프",mark:"ALP"},
+      gaia:{label:"가이아",mark:"GAEA"}
+    };
+    const favoriteProducts={
+      alp:[
+        {value:"immun",label:"이뮨 찜하기"},
+        {value:"iron_drop",label:"아이언드롭 찜하기"}
+      ],
+      gaia:[
+        {value:"oil",label:"오일 찜하기"},
+        {value:"pickles",label:"병절임 찜하기"},
+        {value:"pouch",label:"파우치 찜하기"}
+      ]
+    };
+    const campaignProducts={
+      alp:[
+        {value:"immun",label:"알프이뮨"},
+        {value:"iron_drop",label:"알프아이언드롭"}
+      ],
+      gaia:[
+        {value:"oil",label:"오일"},
+        {value:"pickles",label:"병절임"},
+        {value:"pouch",label:"파우치"}
+      ]
+    };
+    const proposalRowsByBrand={
+      alp:[{url:"",product:"immun"}],
+      gaia:[{url:"",product:"oil"}]
+    };
+    let currentBrand="alp",pollTimer=null,favoritePollTimer=null,proposalPollTimer=null;
+    let latestCrawlStatus=null,latestFavoriteStatus=null,latestProposalStatus=null;
+    let crawlIsRunning=false,favoriteIsRunning=false,proposalIsRunning=false;
+    const runningStatuses=new Set(["queued","preparing","running","saving","login_required"]);
+    async function request(url,options){
+      const response=await fetch(url,options),data=await response.json();
+      if(!response.ok)throw new Error(data.error||"요청을 처리하지 못했습니다.");
+      return data;
+    }
+    function updateFilterSummary(){
+      const source=document.getElementById("crawlSource").value;
+      const sourceLabel={both:"블로그와 인스타그램",blog:"블로그",instagram:"인스타그램"}[source];
+      const topics=currentBrand==="alp"?"생활건강 + 운동/레저":"푸드";
+      document.getElementById("filterSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · ${sourceLabel} · 활동 주제 <strong>${topics}</strong> · 콘텐츠 제휴 경험 · <strong>실행 직전 Google 시트 최신화</strong> · 기존 B열 중복 제외`;
+    }
+    function todayGroupName(){
+      const now=new Date();
+      const stamp=`${String(now.getFullYear()).slice(-2)}.${String(now.getMonth()+1).padStart(2,"0")}.${String(now.getDate()).padStart(2,"0")}`;
+      const platform=document.getElementById("favoritePlatform").value==="blog"?"블로그":"인스타그램";
+      return `${brands[currentBrand].label} ${platform} (${stamp})`;
+    }
+    function renderFavoriteProducts(){
+      const select=document.getElementById("favoriteProduct");
+      const previous=select.value;
+      select.replaceChildren();
+      favoriteProducts[currentBrand].forEach(product=>{
+        const option=document.createElement("option");
+        option.value=product.value;option.textContent=product.label;select.append(option);
+      });
+      if([...select.options].some(option=>option.value===previous))select.value=previous;
+      updateFavoriteSummary();
+    }
+    function updateFavoriteSummary(){
+      const product=document.getElementById("favoriteProduct").selectedOptions[0]?.textContent||"";
+      const count=document.getElementById("favoriteCount").value;
+      document.getElementById("favoriteSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · ${product} · <strong>실행 직전 Google 시트 최신화</strong> · 선택 열이 빈칸인 사람부터 <strong>${count}명</strong> · 그룹 <strong>${todayGroupName()}</strong> · 완료 후 해당 상품 열에 '대기' 표시`;
+      document.getElementById("favoriteGroupNote").textContent=`사용할 찜 그룹: ${todayGroupName()} · 실행 중에도 다른 업무를 계속할 수 있습니다.`;
+    }
+    function updateProposalSummary(){
+      const rows=proposalRowsByBrand[currentBrand];
+      const filled=rows.filter(row=>row.url.trim()).length;
+      document.getElementById("proposalSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · 등록 링크 <strong>${filled}개</strong> · 상태는 상품 열에 대기/수락/거절로 반영 · 제출 콘텐츠는 <strong>J열</strong>에 링크 저장 · <strong>실행 직전 Google 시트 최신화</strong>`;
+    }
+    function renderCampaignRows(){
+      const container=document.getElementById("campaignList");
+      container.replaceChildren();
+      proposalRowsByBrand[currentBrand].forEach((row,index)=>{
+        const wrapper=document.createElement("div");
+        wrapper.className="campaign-row";
+        const input=document.createElement("input");
+        input.type="url";
+        input.placeholder="https://brandconnect.naver.com/.../campaign/.../progress";
+        input.setAttribute("aria-label",`캠페인 링크 ${index+1}`);
+        input.value=row.url;
+        input.addEventListener("input",()=>{row.url=input.value;updateProposalSummary()});
+        const select=document.createElement("select");
+        select.setAttribute("aria-label",`캠페인 상품 ${index+1}`);
+        campaignProducts[currentBrand].forEach(product=>{
+          const option=document.createElement("option");
+          option.value=product.value;option.textContent=product.label;select.append(option);
+        });
+        select.value=row.product;
+        select.addEventListener("change",()=>{row.product=select.value});
+        const remove=document.createElement("button");
+        remove.type="button";remove.className="remove-campaign";remove.textContent="×";
+        remove.setAttribute("aria-label",`캠페인 행 ${index+1} 삭제`);
+        remove.addEventListener("click",()=>{
+          const rows=proposalRowsByBrand[currentBrand];
+          if(rows.length===1)rows[0].url="";
+          else rows.splice(index,1);
+          renderCampaignRows();
+        });
+        wrapper.append(input,select,remove);
+        container.append(wrapper);
+      });
+      updateProposalSummary();
+      updateControls();
+    }
+    function addCampaignRow(){
+      const rows=proposalRowsByBrand[currentBrand];
+      if(rows.length>=20){
+        document.getElementById("proposalStatusMessage").textContent="한 번에 최대 20개까지 등록할 수 있습니다.";
+        return;
+      }
+      rows.push({url:"",product:campaignProducts[currentBrand][0].value});
+      renderCampaignRows();
+    }
+    function updateControls(){
+      const anyRunning=crawlIsRunning||favoriteIsRunning||proposalIsRunning;
+      document.getElementById("startCrawl").disabled=anyRunning;
+      document.getElementById("stopCrawl").disabled=!crawlIsRunning;
+      document.getElementById("crawlSource").disabled=anyRunning;
+      document.getElementById("crawlCount").disabled=anyRunning;
+      document.getElementById("startFavorite").disabled=anyRunning;
+      document.getElementById("stopFavorite").disabled=!favoriteIsRunning;
+      document.getElementById("favoritePlatform").disabled=anyRunning;
+      document.getElementById("favoriteProduct").disabled=anyRunning;
+      document.getElementById("favoriteCount").disabled=anyRunning;
+      document.getElementById("startProposal").disabled=anyRunning;
+      document.getElementById("stopProposal").disabled=!proposalIsRunning;
+      document.getElementById("addCampaign").disabled=anyRunning;
+      document.querySelectorAll(".campaign-row input,.campaign-row select,.remove-campaign").forEach(control=>control.disabled=anyRunning);
+      document.querySelectorAll("button[data-brand]").forEach(button=>button.disabled=anyRunning);
+    }
+    function applyStatus(status){
+      latestCrawlStatus=status;
+      const running=runningStatuses.has(status.status);
+      const visibleStatus=status.brand&&status.brand!==currentBrand
+        ? {status:"idle",message:"크롤링 대기 중",requested:0,collected:0,added:0,duplicates:0}
+        : status;
+      const requested=Number(visibleStatus.requested||0),collected=Number(visibleStatus.collected||0);
+      crawlIsRunning=running;
+      document.getElementById("statusMessage").textContent=visibleStatus.message||"크롤링 대기 중";
+      document.getElementById("statusBadge").textContent={idle:"대기",queued:"준비",preparing:"원본 확인",running:"진행 중",saving:"저장 중",login_required:"로그인 필요",completed:"완료",completed_with_warning:"확인 필요",failed:"실패",stopped:"중단"}[visibleStatus.status]||visibleStatus.status;
+      document.getElementById("collectedCount").textContent=`${collected.toLocaleString()}명`;
+      document.getElementById("addedCount").textContent=`${Number(visibleStatus.added||0).toLocaleString()}명`;
+      document.getElementById("duplicateCount").textContent=`${Number(visibleStatus.duplicates||0).toLocaleString()}명`;
+      document.getElementById("crawlProgress").style.width=`${requested?Math.min(100,collected/requested*100):0}%`;
+      document.getElementById("resumeCrawl").hidden=visibleStatus.status!=="login_required";
+      updateControls();
+      clearTimeout(pollTimer);
+      if(running)pollTimer=setTimeout(loadStatus,2000);
+    }
+    function applyFavoriteStatus(status){
+      latestFavoriteStatus=status;
+      const running=runningStatuses.has(status.status);
+      const visibleStatus=status.brand&&status.brand!==currentBrand
+        ? {status:"idle",message:"찜 자동화 대기 중",requested:0,processed:0,marked:0,failed:0,group_name:""}
+        : status;
+      const requested=Number(visibleStatus.requested||0),processed=Number(visibleStatus.processed||0);
+      favoriteIsRunning=running;
+      document.getElementById("favoriteStatusMessage").textContent=visibleStatus.message||"찜 자동화 대기 중";
+      document.getElementById("favoriteStatusBadge").textContent={idle:"대기",queued:"준비",preparing:"시트 확인",running:"진행 중",saving:"시트 저장",login_required:"로그인 필요",completed:"완료",completed_with_warning:"확인 필요",failed:"실패",stopped:"중단"}[visibleStatus.status]||visibleStatus.status;
+      document.getElementById("favoriteProcessed").textContent=`${processed.toLocaleString()}명`;
+      document.getElementById("favoriteMarked").textContent=`${Number(visibleStatus.marked||0).toLocaleString()}명`;
+      document.getElementById("favoriteFailed").textContent=`${Number(visibleStatus.failed||0).toLocaleString()}명`;
+      document.getElementById("favoriteProgress").style.width=`${requested?Math.min(100,processed/requested*100):0}%`;
+      document.getElementById("resumeFavorite").hidden=visibleStatus.status!=="login_required";
+      if(visibleStatus.group_name)document.getElementById("favoriteGroupNote").textContent=`사용할 찜 그룹: ${visibleStatus.group_name} · 실행 중에도 다른 업무를 계속할 수 있습니다.`;
+      else updateFavoriteSummary();
+      updateControls();
+      clearTimeout(favoritePollTimer);
+      if(running)favoritePollTimer=setTimeout(loadFavoriteStatus,2000);
+    }
+    function applyProposalStatus(status){
+      latestProposalStatus=status;
+      const running=runningStatuses.has(status.status);
+      const visibleStatus=status.brand&&status.brand!==currentBrand
+        ? {status:"idle",message:"제안 결과 확인 대기 중",campaign_count:0,processed_campaigns:0,creators_seen:0,updated:0,links:0,unmatched:0,errors:[]}
+        : status;
+      const total=Number(visibleStatus.campaign_count||0),processed=Number(visibleStatus.processed_campaigns||0);
+      proposalIsRunning=running;
+      document.getElementById("proposalStatusMessage").textContent=visibleStatus.message||"제안 결과 확인 대기 중";
+      document.getElementById("proposalStatusBadge").textContent={idle:"대기",queued:"준비",preparing:"원본 확인",running:"확인 중",saving:"시트 저장",login_required:"로그인 필요",completed:"완료",completed_with_warning:"확인 필요",failed:"실패",stopped:"중단"}[visibleStatus.status]||visibleStatus.status;
+      document.getElementById("proposalCreators").textContent=`${Number(visibleStatus.creators_seen||0).toLocaleString()}명`;
+      document.getElementById("proposalUpdated").textContent=`${Number(visibleStatus.updated||0).toLocaleString()}건`;
+      document.getElementById("proposalLinks").textContent=`${Number(visibleStatus.links||0).toLocaleString()}건`;
+      document.getElementById("proposalProgress").style.width=`${total?Math.min(100,processed/total*100):0}%`;
+      document.getElementById("resumeProposal").hidden=visibleStatus.status!=="login_required";
+      document.getElementById("proposalNote").textContent=visibleStatus.current_campaign?`확인 중: ${visibleStatus.current_campaign}`:`시트 미매칭 ${Number(visibleStatus.unmatched||0).toLocaleString()}명 · 실행 중에도 다른 업무를 계속할 수 있습니다.`;
+      const errors=document.getElementById("proposalErrors");
+      errors.replaceChildren();
+      (visibleStatus.errors||[]).forEach(message=>{
+        const item=document.createElement("li");item.textContent=message;errors.append(item);
+      });
+      errors.hidden=!errors.children.length;
+      updateControls();
+      clearTimeout(proposalPollTimer);
+      if(running)proposalPollTimer=setTimeout(loadProposalStatus,2000);
+    }
+    async function loadStatus(){
+      try{applyStatus(await request("/api/brand-connecting/crawl/status"))}
+      catch(error){document.getElementById("statusMessage").textContent=error.message}
+    }
+    async function loadFavoriteStatus(){
+      try{applyFavoriteStatus(await request("/api/brand-connecting/favorite/status"))}
+      catch(error){document.getElementById("favoriteStatusMessage").textContent=error.message}
+    }
+    async function loadProposalStatus(){
+      try{applyProposalStatus(await request("/api/brand-connecting/proposal/status"))}
+      catch(error){document.getElementById("proposalStatusMessage").textContent=error.message}
+    }
+    async function startCrawl(){
+      const count=Math.max(1,Math.min(200,Number(document.getElementById("crawlCount").value)||100));
+      document.getElementById("crawlCount").value=count;
+      try{
+        const status=await request("/api/brand-connecting/crawl/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({brand:currentBrand,source:document.getElementById("crawlSource").value,count})});
+        applyStatus(status);
+      }catch(error){document.getElementById("statusMessage").textContent=error.message}
+    }
+    async function startFavorite(){
+      try{
+        const status=await request("/api/brand-connecting/favorite/start",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            brand:currentBrand,
+            platform:document.getElementById("favoritePlatform").value,
+            product:document.getElementById("favoriteProduct").value,
+            count:Number(document.getElementById("favoriteCount").value)
+          })
+        });
+        applyFavoriteStatus(status);
+      }catch(error){document.getElementById("favoriteStatusMessage").textContent=error.message}
+    }
+    async function startProposal(){
+      const campaigns=proposalRowsByBrand[currentBrand]
+        .map(row=>({url:row.url.trim(),product:row.product}))
+        .filter(row=>row.url);
+      if(!campaigns.length){
+        document.getElementById("proposalStatusMessage").textContent="확인할 캠페인 링크를 입력해주세요.";
+        return;
+      }
+      try{
+        const status=await request("/api/brand-connecting/proposal/start",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({brand:currentBrand,campaigns})
+        });
+        applyProposalStatus(status);
+      }catch(error){document.getElementById("proposalStatusMessage").textContent=error.message}
+    }
+    function selectBrand(brand){
+      if(!brands[brand])brand="alp";
+      currentBrand=brand;
+      document.body.dataset.brand=brand;
+      document.querySelectorAll("[data-brand]").forEach(button=>button.classList.toggle("active",button.dataset.brand===brand));
+      document.getElementById("workspaceTitle").textContent=`${brands[brand].label} 브랜드 커넥팅`;
+      document.getElementById("brandMark").textContent=brands[brand].mark;
+      localStorage.setItem("brandConnectingBrand",brand);
+      updateFilterSummary();
+      renderFavoriteProducts();
+      renderCampaignRows();
+      if(latestCrawlStatus)applyStatus(latestCrawlStatus);
+      if(latestFavoriteStatus)applyFavoriteStatus(latestFavoriteStatus);
+      if(latestProposalStatus)applyProposalStatus(latestProposalStatus);
+    }
+    document.querySelectorAll("button[data-brand]").forEach(button=>button.addEventListener("click",()=>selectBrand(button.dataset.brand)));
+    document.getElementById("crawlSource").addEventListener("change",updateFilterSummary);
+    document.getElementById("favoritePlatform").addEventListener("change",updateFavoriteSummary);
+    document.getElementById("favoriteProduct").addEventListener("change",updateFavoriteSummary);
+    document.getElementById("favoriteCount").addEventListener("change",updateFavoriteSummary);
+    document.getElementById("startCrawl").addEventListener("click",startCrawl);
+    document.getElementById("startFavorite").addEventListener("click",startFavorite);
+    document.getElementById("addCampaign").addEventListener("click",addCampaignRow);
+    document.getElementById("startProposal").addEventListener("click",startProposal);
+    document.getElementById("resumeCrawl").addEventListener("click",async()=>{try{applyStatus(await request("/api/brand-connecting/crawl/resume",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}))}catch(error){document.getElementById("statusMessage").textContent=error.message}});
+    document.getElementById("stopCrawl").addEventListener("click",async()=>{try{applyStatus(await request("/api/brand-connecting/crawl/stop",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}))}catch(error){document.getElementById("statusMessage").textContent=error.message}});
+    document.getElementById("resumeFavorite").addEventListener("click",async()=>{try{applyFavoriteStatus(await request("/api/brand-connecting/favorite/resume",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}))}catch(error){document.getElementById("favoriteStatusMessage").textContent=error.message}});
+    document.getElementById("stopFavorite").addEventListener("click",async()=>{try{applyFavoriteStatus(await request("/api/brand-connecting/favorite/stop",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}))}catch(error){document.getElementById("favoriteStatusMessage").textContent=error.message}});
+    document.getElementById("resumeProposal").addEventListener("click",async()=>{try{applyProposalStatus(await request("/api/brand-connecting/proposal/resume",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}))}catch(error){document.getElementById("proposalStatusMessage").textContent=error.message}});
+    document.getElementById("stopProposal").addEventListener("click",async()=>{try{applyProposalStatus(await request("/api/brand-connecting/proposal/stop",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}))}catch(error){document.getElementById("proposalStatusMessage").textContent=error.message}});
+    selectBrand(localStorage.getItem("brandConnectingBrand")||"alp");
+    loadStatus();
+    loadFavoriteStatus();
+    loadProposalStatus();
+  </script>
+</body>
+</html>

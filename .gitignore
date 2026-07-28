@@ -1,0 +1,31 @@
+# Credentials and local authentication
+.env
+.env.*
+*.token
+*token*.json
+*credentials*.json
+app_data/
+
+# Business data and generated files
+data/
+recordings/
+uploads/
+downloads/
+*.xlsx
+*.xls
+*.csv
+*.wav
+*.mp3
+*.m4a
+*.webm
+
+# Runtime and logs
+.venv/
+__pycache__/
+*.pyc
+*.log
+work/
+
+# Local editor / OS files
+.DS_Store
+Thumbs.db
