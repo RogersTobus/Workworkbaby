@@ -226,6 +226,38 @@ class BrandConnectProposalManager:
     def _login_required(page: Any) -> bool:
         return "nid.naver.com" in str(page.url) or "nidlogin" in str(page.url)
 
+    def _navigate(self, page: Any, url: str) -> None:
+        """Navigate while tolerating Naver's immediate login redirect."""
+        recoverable_error: Exception | None = None
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+        except Exception as exc:
+            message = str(exc)
+            recoverable_navigation = (
+                "interrupted by another navigation" in message
+                or "ERR_ABORTED" in message
+                or "Timeout" in message
+            )
+            if not recoverable_navigation:
+                raise
+            recoverable_error = exc
+
+        # A login redirect can continue after goto() returns (or interrupts).
+        # Wait until either the login page or the campaign table is observable.
+        for _ in range(40):
+            if self.stop_event.is_set():
+                return
+            if self._login_required(page):
+                return
+            try:
+                if page.locator("table tbody tr").count() > 0:
+                    return
+            except Exception:
+                pass
+            page.wait_for_timeout(500)
+        if recoverable_error is not None:
+            raise recoverable_error
+
     def _wait_for_login(self, page: Any, url: str) -> bool:
         if not self._login_required(page):
             return True
@@ -240,13 +272,7 @@ class BrandConnectProposalManager:
         self.resume_event.wait()
         if self.stop_event.is_set():
             return False
-        page.goto(url, wait_until="domcontentloaded", timeout=60_000)
-        for _ in range(20):
-            if self._login_required(page):
-                break
-            if page.locator("table tbody tr").count() > 0:
-                break
-            page.wait_for_timeout(500)
+        self._navigate(page, url)
         return not self._login_required(page)
 
     @staticmethod
@@ -405,13 +431,7 @@ class BrandConnectProposalManager:
         page: Any,
         campaign: dict[str, str],
     ) -> list[dict[str, Any]]:
-        page.goto(campaign["url"], wait_until="domcontentloaded", timeout=60_000)
-        for _ in range(20):
-            if self._login_required(page):
-                break
-            if page.locator("table tbody tr").count() > 0:
-                break
-            page.wait_for_timeout(500)
+        self._navigate(page, campaign["url"])
         if not self._wait_for_login(page, campaign["url"]):
             raise RuntimeError("네이버 브랜드커넥트 로그인을 확인하지 못했습니다.")
         page.locator("table").first.wait_for(state="visible", timeout=15_000)
@@ -447,7 +467,10 @@ class BrandConnectProposalManager:
             sync = self.sync_callback()
             if str(sync.get("status", "")) in {"failed", "login_required"}:
                 raise RuntimeError(sync.get("message") or "Google Drive 최신화에 실패했습니다.")
-            self._open_debug_chrome(campaigns[0]["url"])
+            # Let Playwright perform the first campaign navigation after it
+            # attaches; launching Chrome directly on the same URL can race
+            # with page.goto() and produce an interrupted-navigation error.
+            self._open_debug_chrome("about:blank")
             from playwright.sync_api import sync_playwright
 
             playwright = sync_playwright().start()
