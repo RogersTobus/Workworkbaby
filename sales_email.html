@@ -64,10 +64,22 @@
   </nav>
 
   <section class="grid">
-    <aside class="card">
-      <div class="card-head"><h2>연락처</h2><button class="btn primary" id="newContact">+ 추가</button></div>
-      <input class="search" id="contactSearch" placeholder="이름·회사·이메일 검색">
-      <div class="list" id="contactList"></div>
+    <aside class="left stack">
+      <section class="card">
+        <div class="card-head"><h2>연락처</h2><button class="btn primary" id="newContact">+ 추가</button></div>
+        <input class="search" id="contactSearch" placeholder="이름·회사·이메일 검색">
+        <div class="list" id="contactList"></div>
+      </section>
+      <section class="card contact-editor">
+        <div class="card-head"><h2>연락처 정보</h2><span class="count">수정 후 저장</span></div>
+        <div class="pad stack">
+          <input type="hidden" id="contactId">
+          <div class="row contact-fields"><label>담당자명<input id="contactName"></label><label>회사명<input id="contactCompany"></label></div>
+          <label>이메일<input id="contactEmail" type="email"></label>
+          <label>메모<textarea id="contactMemo" placeholder="관계, 제안 이력, 주의사항"></textarea></label>
+          <div class="row"><button class="btn primary" id="saveContact">연락처 저장</button><button class="btn danger" id="deleteContact">삭제</button></div>
+        </div>
+      </section>
     </aside>
 
     <section class="card">
@@ -120,16 +132,6 @@
     </section>
 
     <aside class="right stack">
-      <section class="card">
-        <div class="card-head"><h2>연락처 정보</h2><span class="count">수정 후 저장</span></div>
-        <div class="pad stack">
-          <input type="hidden" id="contactId">
-          <div class="row"><label>담당자명<input id="contactName"></label><label>회사명<input id="contactCompany"></label></div>
-          <label>이메일<input id="contactEmail" type="email"></label>
-          <label>메모<textarea id="contactMemo" placeholder="관계, 제안 이력, 주의사항"></textarea></label>
-          <div class="row"><button class="btn primary" id="saveContact">연락처 저장</button><button class="btn danger" id="deleteContact">삭제</button></div>
-        </div>
-      </section>
       <section class="card">
         <div class="card-head"><h2>최근 발송 이력</h2><span class="count" id="historyCount">0건</span></div>
         <div class="history" id="historyList"></div>

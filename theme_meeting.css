@@ -384,6 +384,15 @@ th {
   padding: 14px;
 }
 
+.page-sales .left .list {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.page-sales .contact-fields {
+  flex-direction: column;
+}
+
 .page-sales .drop {
   min-height: 100px;
   display: grid;
