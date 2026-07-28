@@ -49,6 +49,9 @@ MEETINGS_HTML_PATH = APP_DIR / "meetings.html"
 MEMOS_HTML_PATH = APP_DIR / "memos.html"
 SALES_EMAIL_HTML_PATH = APP_DIR / "sales_email.html"
 BRAND_CONNECTING_HTML_PATH = APP_DIR / "brand_connecting.html"
+BRAND_CONNECT_CAMPAIGNS_PATH = (
+    APP_DIR / "app_data" / "brand_connect_campaigns.json"
+)
 BRAND_CONNECTING_SHEETS = {
     "alp": {
         "brand_name": "알프",
@@ -2776,6 +2779,86 @@ BRAND_CONNECT_PROPOSAL_MANAGER = BrandConnectProposalManager(
     lambda: sync_dm_workbook(force=True),
     save_brand_connect_proposals,
 )
+BRAND_CONNECT_CAMPAIGNS_LOCK = threading.Lock()
+
+
+def load_brand_connect_campaigns(brand: str) -> dict:
+    if brand not in {"alp", "gaia"}:
+        raise ValueError("지원하지 않는 브랜드입니다.")
+    with BRAND_CONNECT_CAMPAIGNS_LOCK:
+        try:
+            stored = json.loads(
+                BRAND_CONNECT_CAMPAIGNS_PATH.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            stored = {}
+    rows = stored.get(brand, []) if isinstance(stored, dict) else []
+    if not isinstance(rows, list):
+        rows = []
+    allowed_products = {
+        "alp": {"immun", "iron_drop"},
+        "gaia": {"oil", "pickles", "pouch"},
+    }[brand]
+    campaigns = []
+    for row in rows[:20]:
+        if not isinstance(row, dict):
+            continue
+        product = str(row.get("product", "")).strip()
+        if product not in allowed_products:
+            continue
+        campaigns.append(
+            {
+                "url": str(row.get("url", ""))[:1000],
+                "product": product,
+            }
+        )
+    return {"brand": brand, "campaigns": campaigns}
+
+
+def save_brand_connect_campaigns(payload: dict) -> dict:
+    brand = str(payload.get("brand", "")).strip()
+    if brand not in {"alp", "gaia"}:
+        raise ValueError("지원하지 않는 브랜드입니다.")
+    rows = payload.get("campaigns")
+    if not isinstance(rows, list):
+        raise ValueError("캠페인 목록 형식이 올바르지 않습니다.")
+    if len(rows) > 20:
+        raise ValueError("캠페인 링크는 최대 20개까지 저장할 수 있습니다.")
+    allowed_products = {
+        "alp": {"immun", "iron_drop"},
+        "gaia": {"oil", "pickles", "pouch"},
+    }[brand]
+    campaigns = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("캠페인 행 형식이 올바르지 않습니다.")
+        product = str(row.get("product", "")).strip()
+        if product not in allowed_products:
+            raise ValueError("브랜드에 맞는 상품을 선택해주세요.")
+        campaigns.append(
+            {
+                "url": str(row.get("url", "")).strip()[:1000],
+                "product": product,
+            }
+        )
+    with BRAND_CONNECT_CAMPAIGNS_LOCK:
+        try:
+            stored = json.loads(
+                BRAND_CONNECT_CAMPAIGNS_PATH.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            stored = {}
+        if not isinstance(stored, dict):
+            stored = {}
+        stored[brand] = campaigns
+        BRAND_CONNECT_CAMPAIGNS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temporary = BRAND_CONNECT_CAMPAIGNS_PATH.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(stored, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temporary.replace(BRAND_CONNECT_CAMPAIGNS_PATH)
+    return {"ok": True, "brand": brand, "campaigns": campaigns}
 
 
 def copy_cell_style(source, destination) -> None:
@@ -3057,6 +3140,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json(BRAND_CONNECT_FAVORITE_MANAGER.snapshot())
             elif path == "/api/brand-connecting/proposal/status":
                 self.send_json(BRAND_CONNECT_PROPOSAL_MANAGER.snapshot())
+            elif path == "/api/brand-connecting/proposal/campaigns":
+                brand_key = parse_qs(parsed.query).get("brand", ["alp"])[0]
+                self.send_json(load_brand_connect_campaigns(brand_key))
             elif path == "/api/meetings/ai/status":
                 self.send_json(meeting_ai_status())
             elif path == "/api/meetings/ai/job":
@@ -3217,6 +3303,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 )
             elif path == "/api/brand-connecting/proposal/stop":
                 self.send_json(BRAND_CONNECT_PROPOSAL_MANAGER.stop())
+            elif path == "/api/brand-connecting/proposal/campaigns":
+                self.send_json(save_brand_connect_campaigns(payload))
             elif path == "/api/prices/start":
                 self.send_json(PRICE_MANAGER.start())
             elif path == "/api/prices/resume":

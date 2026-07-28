@@ -264,6 +264,7 @@
       alp:[{url:"",product:"immun"}],
       gaia:[{url:"",product:"oil"}]
     };
+    const proposalSaveTimers={alp:null,gaia:null};
     let currentBrand="alp",pollTimer=null,favoritePollTimer=null,proposalPollTimer=null;
     let latestCrawlStatus=null,latestFavoriteStatus=null,latestProposalStatus=null;
     let crawlIsRunning=false,favoriteIsRunning=false,proposalIsRunning=false;
@@ -307,6 +308,32 @@
       const filled=rows.filter(row=>row.url.trim()).length;
       document.getElementById("proposalSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · 등록 링크 <strong>${filled}개</strong> · 상태는 상품 열에 대기/수락/거절로 반영 · 제출 콘텐츠는 <strong>J열</strong>에 링크 저장 · <strong>실행 직전 Google 시트 최신화</strong>`;
     }
+    function saveCampaignRows(brand=currentBrand,immediate=false){
+      const campaigns=proposalRowsByBrand[brand].map(row=>({
+        url:String(row.url||""),
+        product:String(row.product||"")
+      }));
+      const persist=()=>request("/api/brand-connecting/proposal/campaigns",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({brand,campaigns})
+      }).catch(error=>{
+        document.getElementById("proposalStatusMessage").textContent=`링크 저장 실패: ${error.message}`;
+      });
+      clearTimeout(proposalSaveTimers[brand]);
+      if(immediate)persist();
+      else proposalSaveTimers[brand]=setTimeout(persist,300);
+    }
+    async function loadCampaignRows(){
+      for(const brand of ["alp","gaia"]){
+        try{
+          const saved=await request(`/api/brand-connecting/proposal/campaigns?brand=${brand}`);
+          if(Array.isArray(saved.campaigns))proposalRowsByBrand[brand]=saved.campaigns;
+        }catch(error){
+          document.getElementById("proposalStatusMessage").textContent=`저장된 링크 불러오기 실패: ${error.message}`;
+        }
+      }
+    }
     function renderCampaignRows(){
       const container=document.getElementById("campaignList");
       container.replaceChildren();
@@ -318,7 +345,11 @@
         input.placeholder="https://brandconnect.naver.com/.../campaign/.../progress";
         input.setAttribute("aria-label",`캠페인 링크 ${index+1}`);
         input.value=row.url;
-        input.addEventListener("input",()=>{row.url=input.value;updateProposalSummary()});
+        input.addEventListener("input",()=>{
+          row.url=input.value;
+          updateProposalSummary();
+          saveCampaignRows();
+        });
         const select=document.createElement("select");
         select.setAttribute("aria-label",`캠페인 상품 ${index+1}`);
         campaignProducts[currentBrand].forEach(product=>{
@@ -326,14 +357,17 @@
           option.value=product.value;option.textContent=product.label;select.append(option);
         });
         select.value=row.product;
-        select.addEventListener("change",()=>{row.product=select.value});
+        select.addEventListener("change",()=>{
+          row.product=select.value;
+          saveCampaignRows();
+        });
         const remove=document.createElement("button");
         remove.type="button";remove.className="remove-campaign";remove.textContent="×";
         remove.setAttribute("aria-label",`캠페인 행 ${index+1} 삭제`);
         remove.addEventListener("click",()=>{
           const rows=proposalRowsByBrand[currentBrand];
-          if(rows.length===1)rows[0].url="";
-          else rows.splice(index,1);
+          rows.splice(index,1);
+          saveCampaignRows(currentBrand,true);
           renderCampaignRows();
         });
         wrapper.append(input,select,remove);
@@ -349,6 +383,7 @@
         return;
       }
       rows.push({url:"",product:campaignProducts[currentBrand][0].value});
+      saveCampaignRows();
       renderCampaignRows();
     }
     function updateControls(){
@@ -514,10 +549,14 @@
     document.getElementById("stopFavorite").addEventListener("click",async()=>{try{applyFavoriteStatus(await request("/api/brand-connecting/favorite/stop",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}))}catch(error){document.getElementById("favoriteStatusMessage").textContent=error.message}});
     document.getElementById("resumeProposal").addEventListener("click",async()=>{try{applyProposalStatus(await request("/api/brand-connecting/proposal/resume",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}))}catch(error){document.getElementById("proposalStatusMessage").textContent=error.message}});
     document.getElementById("stopProposal").addEventListener("click",async()=>{try{applyProposalStatus(await request("/api/brand-connecting/proposal/stop",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}))}catch(error){document.getElementById("proposalStatusMessage").textContent=error.message}});
-    selectBrand(localStorage.getItem("brandConnectingBrand")||"alp");
-    loadStatus();
-    loadFavoriteStatus();
-    loadProposalStatus();
+    async function initialize(){
+      await loadCampaignRows();
+      selectBrand(localStorage.getItem("brandConnectingBrand")||"alp");
+      loadStatus();
+      loadFavoriteStatus();
+      loadProposalStatus();
+    }
+    initialize();
   </script>
 </body>
 </html>
