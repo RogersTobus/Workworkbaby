@@ -4,6 +4,7 @@
 *.token
 *token*.json
 *credentials*.json
+config.json
 app_data/
 
 # Business data and generated files
@@ -11,6 +12,7 @@ data/
 recordings/
 uploads/
 downloads/
+sales_email_assets/
 *.xlsx
 *.xls
 *.csv
