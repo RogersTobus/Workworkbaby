@@ -1,0 +1,221 @@
+:root,
+body,
+body[data-brand="alp"],
+body[data-brand="gaia"] {
+  --ink: #17233b !important;
+  --muted: #7f899d !important;
+  --line: #e4e9f1 !important;
+  --paper: #f5f7fb !important;
+  --bg: #f5f7fb !important;
+  --card: #ffffff !important;
+  --panel: #ffffff !important;
+  --navy: #17233b !important;
+  --green: #365edc !important;
+  --blue: #365edc !important;
+  --lime: #dfe6ff !important;
+  --mint: #eef2ff !important;
+  --soft: #f5f7fb !important;
+  --shadow: 0 18px 45px rgba(29, 42, 78, .09) !important;
+}
+
+body {
+  color: #17233b !important;
+  background: #f5f7fb !important;
+  font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", "Segoe UI", sans-serif !important;
+}
+
+.eyebrow {
+  color: #365edc !important;
+}
+
+.safe {
+  color: #7f899d !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.nav,
+.master-nav,
+nav {
+  flex-wrap: wrap;
+}
+
+.nav a,
+.master-nav a,
+nav a {
+  color: #64708a !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.nav a:hover,
+.master-nav a:hover,
+nav a:hover {
+  background: #ffffff !important;
+}
+
+.nav a.active,
+.master-nav a.active,
+nav a.active {
+  color: #ffffff !important;
+  background: #17233b !important;
+  border-color: #17233b !important;
+}
+
+.card,
+.workspace {
+  background: #ffffff !important;
+  border-color: #e4e9f1 !important;
+  box-shadow: 0 18px 45px rgba(29, 42, 78, .09) !important;
+}
+
+input,
+select,
+textarea,
+.field input,
+.field select,
+.campaign-row input,
+.campaign-row select {
+  color: #17233b !important;
+  background: #fbfcfe !important;
+  border-color: #ced8e4 !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.field input:focus,
+.field select:focus,
+.campaign-row input:focus,
+.campaign-row select:focus {
+  border-color: #6e8ce8 !important;
+  box-shadow: 0 0 0 3px rgba(54, 94, 220, .12) !important;
+}
+
+.primary,
+.start-button,
+.favorite-start,
+.proposal-start,
+.new-button,
+.ai-button,
+.reference-card button,
+.brand-switch button.active {
+  color: #ffffff !important;
+  background: #365edc !important;
+  border-color: #365edc !important;
+}
+
+.resume,
+.resume-button,
+.favorite-resume,
+.proposal-resume,
+.sent {
+  color: #365edc !important;
+  background: #eef2ff !important;
+}
+
+.stop,
+.stop-button,
+.favorite-stop,
+.proposal-stop,
+.secondary,
+.sync-button,
+.add-campaign {
+  color: #365edc !important;
+  background: #ffffff !important;
+  border-color: #cfd8f4 !important;
+}
+
+.brand-switch {
+  background: #ffffff !important;
+  border-color: #e4e9f1 !important;
+}
+
+.brand-mark,
+.badge,
+.status-badge,
+.locked {
+  color: #365edc !important;
+  background: #eef2ff !important;
+}
+
+.progress,
+.progress > div {
+  border-radius: 999px;
+}
+
+.progress {
+  background: #e7ebf3 !important;
+}
+
+.progress > div,
+.progress div {
+  background: #365edc !important;
+}
+
+.rule,
+.kpi,
+.meta div,
+.account-box,
+.filter-summary,
+.status-card,
+.status-meta div,
+.current,
+.reference-card,
+.history-item,
+.composer-head {
+  background: #f5f7fb !important;
+}
+
+.filter-summary strong,
+.rule b,
+.results-head a,
+.ok {
+  color: #365edc !important;
+}
+
+.mode label:has(input:checked),
+.contact:hover,
+.contact.active,
+.memo-item.active {
+  color: #365edc !important;
+  background: #eef2ff !important;
+  border-color: #aebff3 !important;
+}
+
+.brand:has(input:checked) {
+  color: #ffffff !important;
+  background: #365edc !important;
+  border-color: #365edc !important;
+}
+
+.memo-item:hover {
+  border-color: #aebff3 !important;
+  box-shadow: 0 10px 22px rgba(54, 94, 220, .10) !important;
+}
+
+.platform::before {
+  background: #365edc !important;
+}
+
+.hint,
+.fixed-cc {
+  color: #52617b !important;
+  background: #eef2ff !important;
+  border-color: #d5dffb !important;
+}
+
+.cc-chip {
+  color: #365edc !important;
+  background: #dfe6ff !important;
+}
+
+.drop.drag {
+  color: #365edc !important;
+  background: #eef2ff !important;
+  border-color: #365edc !important;
+}
+
+.toast {
+  background: #17233b !important;
+}

@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Instagram DM 도우미</title>
+  <style>
+    :root {
+      --ink: #17211d;
+      --muted: #68746e;
+      --paper: #f4f7f4;
+      --card: #ffffff;
+      --green: #174f39;
+      --lime: #cde466;
+      --line: #dce4df;
+      --orange: #d86b35;
+      --shadow: 0 18px 50px rgba(18, 54, 40, .10);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(205, 228, 102, .28), transparent 34rem),
+        var(--paper);
+      font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+    }
+    body[data-brand="gaia"] {
+      --green: #4d5a24;
+      --lime: #d8c56a;
+      --paper: #f7f5ec;
+      --line: #e3dfca;
+      --shadow: 0 18px 50px rgba(77, 90, 36, .11);
+    }
+    main { width: min(1120px, calc(100% - 40px)); margin: 34px auto 60px; }
+    header {
+      display: flex; align-items: end; justify-content: space-between; gap: 24px;
+      margin-bottom: 22px;
+    }
+    .eyebrow { color: var(--green); font-weight: 800; letter-spacing: .12em; font-size: 12px; }
+    h1 { margin: 7px 0 0; font-size: clamp(28px, 4vw, 44px); letter-spacing: -.04em; }
+    .safe {
+      border: 1px solid #b7c9bf; border-radius: 999px; padding: 9px 13px;
+      background: rgba(255,255,255,.7); color: var(--green); font-size: 13px; font-weight: 700;
+    }
+    .brand-switch {
+      display: inline-flex; gap: 7px; padding: 5px; margin-bottom: 18px;
+      background: rgba(255,255,255,.78); border: 1px solid var(--line); border-radius: 14px;
+    }
+    .brand-switch button {
+      min-width: 105px; padding: 10px 18px; color: var(--muted); background: transparent;
+    }
+    .brand-switch button.active { color: white; background: var(--green); }
+    .dm-toolbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 14px;
+      margin-bottom: 18px;
+    }
+    .dm-toolbar .brand-switch { margin-bottom: 0; }
+    .reference-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid #d9e2ea;
+      border-radius: 14px;
+      background: #f8fafc;
+    }
+    .reference-card img {
+      width: 190px;
+      max-height: 94px;
+      object-fit: contain;
+      border-radius: 8px;
+      background: white;
+      border: 1px solid #e5e7eb;
+    }
+    .reference-card .reference-info { flex: 1; min-width: 0; }
+    .reference-card .reference-name {
+      display: block;
+      margin: 4px 0 10px;
+      color: #475569;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .reference-card button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: #0f766e;
+      color: white;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .sync-group { display: flex; align-items: center; gap: 10px; }
+    .sync-button {
+      padding: 10px 15px; color: var(--green); background: white;
+      border: 1px solid #b9cbc1;
+    }
+    .sync-status { color: var(--muted); font-size: 12px; }
+    .master-nav { display: flex; gap: 8px; margin: 0 0 18px; }
+    .master-nav a {
+      padding: 10px 15px; border: 1px solid var(--line); border-radius: 12px;
+      color: var(--muted); background: rgba(255,255,255,.72); text-decoration: none;
+      font-size: 13px; font-weight: 800;
+    }
+    .master-nav a.active { color: white; background: var(--ink); border-color: var(--ink); }
+    .account-box {
+      margin-top: 12px; padding: 13px; border-radius: 12px; background: #f5f8f6;
+      border-left: 4px solid var(--lime);
+    }
+    .grid { display: grid; grid-template-columns: 1.35fr .65fr; gap: 18px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 22px;
+      box-shadow: var(--shadow);
+    }
+    .main-card { padding: 28px; }
+    .side { display: grid; gap: 18px; align-content: start; }
+    .stats { padding: 21px; }
+    .label { color: var(--muted); font-size: 13px; font-weight: 700; }
+    .target-row { display: flex; justify-content: space-between; align-items: center; gap: 18px; }
+    .handle { font-size: 30px; font-weight: 850; letter-spacing: -.035em; margin: 5px 0; word-break: break-all; }
+    .position { color: var(--muted); font-size: 14px; white-space: nowrap; }
+    textarea {
+      margin: 20px 0 16px; width: 100%; min-height: 390px; resize: vertical;
+      border: 1px solid var(--line); border-radius: 15px; background: #fbfcfb;
+      padding: 18px; font: 15px/1.62 "Segoe UI", "Malgun Gothic", sans-serif; color: var(--ink);
+    }
+    .actions { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; }
+    button {
+      border: 0; border-radius: 13px; padding: 14px 16px; cursor: pointer;
+      font-weight: 800; font-size: 14px; transition: transform .12s, opacity .12s;
+    }
+    button:hover { transform: translateY(-1px); }
+    button:disabled { cursor: not-allowed; opacity: .45; transform: none; }
+    .primary { background: var(--green); color: white; }
+    .sent { background: var(--lime); color: #1a291e; }
+    .skip { background: #edf1ee; color: #435149; }
+    .secondary { width: 100%; margin-top: 10px; background: white; color: var(--green); border: 1px solid #b9cbc1; }
+    .kpi { display: flex; align-items: baseline; gap: 7px; margin-top: 8px; }
+    .kpi strong { font-size: 36px; letter-spacing: -.05em; }
+    .progress { height: 10px; border-radius: 99px; background: #e9eeeb; overflow: hidden; margin: 14px 0 8px; }
+    .progress > div { height: 100%; background: var(--lime); width: 0; transition: width .25s; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    .meta div { background: #f5f8f6; padding: 12px; border-radius: 12px; }
+    .meta b { display: block; margin-top: 4px; }
+    .note { margin-top: 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .toast {
+      position: fixed; right: 24px; bottom: 24px; max-width: 390px; padding: 14px 17px;
+      color: white; background: var(--green); border-radius: 12px; box-shadow: var(--shadow);
+      opacity: 0; transform: translateY(12px); pointer-events: none; transition: .2s;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.error { background: #9e3d2e; }
+    @media (max-width: 820px) {
+      .grid { grid-template-columns: 1fr; }
+      header { align-items: start; flex-direction: column; }
+      .actions { grid-template-columns: 1fr; }
+      .dm-toolbar { align-items: stretch; flex-direction: column; }
+      .sync-group { justify-content: space-between; }
+    }
+  </style>
+  <link rel="stylesheet" href="/theme-meeting.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <div id="eyebrow" class="eyebrow">WEEKLY OUTREACH</div>
+        <h1>Instagram DM 도우미</h1>
+      </div>
+      <div class="safe">최종 보내기 버튼은 자동 클릭하지 않습니다</div>
+    </header>
+    <nav class="master-nav" aria-label="업무 메뉴">
+      <a href="/brand-connecting">브랜드 커넥팅</a>
+      <a class="active" href="/">Instagram DM</a>
+      <a href="/prices">네이버 가격 최신화</a>
+      <a href="/simulation">시뮬레이션</a>
+      <a href="/calendar">업무 캘린더</a>
+      <a href="/meetings">회의록</a>
+      <a href="/sales-email">영업메일</a>
+    </nav>
+    <div class="dm-toolbar">
+      <div class="brand-switch" aria-label="브랜드 선택">
+        <button type="button" data-brand="alp">ALP</button>
+        <button type="button" data-brand="gaia">GAEA</button>
+      </div>
+      <div class="sync-group">
+        <span id="syncStatus" class="sync-status">온라인 명단 확인 전</span>
+        <button id="refreshDm" type="button" class="sync-button">최신 명단 불러오기</button>
+        <button id="pushDm" type="button" class="sync-button">구글 시트 최신화</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card main-card">
+        <div class="target-row">
+          <div>
+            <div class="label">현재 대상</div>
+            <div id="handle" class="handle">불러오는 중…</div>
+          </div>
+          <div id="position" class="position"></div>
+        </div>
+        <textarea id="message" aria-label="DM 문구"></textarea>
+        <div id="referenceCard" class="reference-card">
+          <img id="referenceImage" alt="공동구매 구성안 미리보기">
+          <div class="reference-info">
+            <b id="referenceTitle">공동구매 구성안</b>
+            <span id="referenceName" class="reference-name"></span>
+            <button id="copyImage" type="button">공구 이미지 복사</button>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="prepare" class="primary">앱 내 Instagram 열기 + 문구 복사</button>
+          <button id="sent" class="sent">발송완료 · 다음</button>
+          <button id="skip" class="skip">건너뛰기</button>
+        </div>
+        <button id="next" class="secondary">기록 없이 다음 대상</button>
+      </section>
+
+      <aside class="side">
+        <section class="card stats">
+          <div id="goalLabel" class="label">이번 주 목표</div>
+          <div class="kpi"><strong id="weeklySent">0</strong><span>/ <b id="goal">30</b>명</span></div>
+          <div class="progress"><div id="bar"></div></div>
+          <div id="week" class="note"></div>
+          <div class="meta">
+            <div><span class="label">남은 목표</span><b id="remaining">-</b></div>
+            <div><span class="label">대기 명단</span><b id="pending">-</b></div>
+            <div><span class="label">이번 실행 발송</span><b id="sessionSent">0</b></div>
+            <div><span class="label">이번 실행 건너뜀</span><b id="sessionSkipped">0</b></div>
+          </div>
+          <div id="exclusion" class="note"></div>
+          <div class="account-box">
+            <span class="label">Instagram 발송 계정</span>
+            <b id="expectedAccount"></b>
+            <div id="loginNote" class="note"></div>
+          </div>
+        </section>
+        <section class="card stats">
+          <div class="label">Excel 기록 위치</div>
+          <p><b id="sheet"></b></p>
+          <div id="recordingNote" class="note"></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    let dashboard = null;
+    let index = 0;
+    let currentBrand = localStorage.getItem("dmBrand") || "alp";
+    let dashboardRequestId = 0;
+    const instagramWorkspaceName = "instagram_dm_workspace";
+    let instagramTab = null;
+
+    const $ = (id) => document.getElementById(id);
+    const buttons = ["prepare", "sent", "skip", "next", "copyImage"].map($);
+
+    function toast(message, isError = false) {
+      const el = $("toast");
+      el.textContent = message;
+      el.className = "toast show" + (isError ? " error" : "");
+      setTimeout(() => { el.className = "toast"; }, 3000);
+    }
+
+    function current() {
+      return dashboard?.targets?.[index] || null;
+    }
+
+    function render() {
+      const target = current();
+      const hasTarget = Boolean(target);
+      $("prepare").disabled = !hasTarget || !dashboard.message_ready;
+      $("sent").disabled = !hasTarget || !dashboard.message_ready;
+      $("skip").disabled = !hasTarget;
+      $("next").disabled = !hasTarget;
+      document.body.dataset.brand = dashboard.theme;
+      document.querySelectorAll(".brand-switch [data-brand]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.brand === currentBrand);
+      });
+      $("eyebrow").textContent = dashboard.eyebrow;
+      $("handle").textContent = hasTarget ? `@${target.instagram_id}` : "대기 대상이 없습니다";
+      $("message").value = hasTarget
+        ? (dashboard.message_ready ? target.message : "가이아 DM 문구는 아직 설정되지 않았습니다.")
+        : "";
+      const hasReferenceImage = Boolean(dashboard.reference_image_url);
+      $("referenceCard").style.display = hasReferenceImage ? "flex" : "none";
+      $("referenceImage").src = hasReferenceImage ? dashboard.reference_image_url : "";
+      $("referenceTitle").textContent = `${dashboard.brand_name} 공동구매 구성안`;
+      $("referenceName").textContent = dashboard.reference_image_name || "";
+      $("copyImage").disabled = !hasReferenceImage;
+      $("position").textContent = hasTarget ? `${index + 1} / ${dashboard.targets.length}` : "";
+      $("goalLabel").textContent = `이번 주 ${dashboard.brand_name} 목표`;
+      $("weeklySent").textContent = dashboard.weekly_sent;
+      $("goal").textContent = dashboard.goal;
+      $("remaining").textContent = `${dashboard.remaining_to_goal}명`;
+      $("pending").textContent = `${dashboard.pending_count}명`;
+      $("sessionSent").textContent = dashboard.session_sent;
+      $("sessionSkipped").textContent = dashboard.session_skipped;
+      $("week").textContent = dashboard.week;
+      $("exclusion").textContent = dashboard.excluded_topics.length
+        ? `자동 제외: ${dashboard.excluded_topics.join(", ")} (${dashboard.excluded_topic_count}명)`
+        : "자동 제외 없음 · 모든 활동주제 대상";
+      $("expectedAccount").textContent = dashboard.expected_account;
+      $("loginNote").textContent = dashboard.login_note;
+      $("sheet").textContent = dashboard.sheet;
+      $("recordingNote").textContent =
+        `발송완료 시 '${dashboard.recording.sent_date_column}' 열에 오늘 날짜를 기록하고, ` +
+        `${dashboard.recording.summary_range}에 날짜와 COUNTIFS 수식을 자동 추가합니다. ` +
+        "건너뛰기는 로컬 기록에 저장하며, 작업용 Excel 파일은 닫아둔 상태에서 사용하세요.";
+      const sync = dashboard.dm_sync || {};
+      $("syncStatus").textContent = sync.message || "온라인 명단 확인 전";
+      $("bar").style.width = `${Math.min(100, dashboard.weekly_sent / dashboard.goal * 100)}%`;
+    }
+
+    async function loadDashboard(preserveIndex = false, forceSync = false) {
+      const requestId = ++dashboardRequestId;
+      const requestedBrand = currentBrand;
+      const response = await fetch(
+        `/api/dashboard?brand=${requestedBrand}&force_sync=${forceSync ? "1" : "0"}`,
+        { cache: "no-store" }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "명단을 불러오지 못했습니다.");
+      if (requestId !== dashboardRequestId || requestedBrand !== currentBrand) return;
+      dashboard = data;
+      if (!preserveIndex) index = 0;
+      if (index >= dashboard.targets.length) index = Math.max(0, dashboard.targets.length - 1);
+      render();
+    }
+
+    async function openInstagramWorkspace(profileUrl) {
+      try {
+        if (instagramTab && !instagramTab.closed) {
+          instagramTab.location.href = profileUrl;
+          instagramTab.focus();
+          return { status: "completed", mode: "reused" };
+        }
+      } catch (error) {
+        instagramTab = null;
+      }
+      instagramTab = window.open(profileUrl, instagramWorkspaceName);
+      if (!instagramTab) {
+        throw new Error("앱 내 Instagram 탭을 열 수 없습니다.");
+      }
+      instagramTab.focus();
+      return { status: "completed", mode: "opened" };
+    }
+
+    async function prepare(automatic = false) {
+      const target = current();
+      if (!target) return;
+      if (!dashboard.message_ready) {
+        toast("가이아 DM 문구를 먼저 설정해주세요.", true);
+        return;
+      }
+      const editedMessage = $("message").value;
+      try {
+        await navigator.clipboard.writeText(editedMessage);
+      } catch (error) {
+        $("message").focus();
+        $("message").select();
+        document.execCommand("copy");
+      }
+      try {
+        const opened = await openInstagramWorkspace(target.profile_url);
+        toast(opened.mode === "reused"
+          ? "기존 앱 내 Instagram 탭을 다음 대상 페이지로 바꾸고 문구를 복사했습니다."
+          : "앱 안에 Instagram 탭을 열고 문구를 복사했습니다.");
+      } catch (error) {
+        toast(error.message, true);
+      }
+    }
+
+    async function copyReferenceImage() {
+      if (!dashboard?.reference_image_url) {
+        toast("공동구매 구성안 이미지가 없습니다.", true);
+        return;
+      }
+      try {
+        const response = await fetch(dashboard.reference_image_url, { cache: "no-store" });
+        if (!response.ok) throw new Error("공동구매 구성안 이미지를 불러오지 못했습니다.");
+        const blob = await response.blob();
+        if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+          throw new Error("이 브라우저에서는 이미지 복사를 지원하지 않습니다.");
+        }
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob })
+        ]);
+        toast(`${dashboard.brand_name} 공구 이미지를 복사했습니다. Instagram DM에 붙여넣으세요.`);
+      } catch (error) {
+        toast(error.message, true);
+      }
+    }
+
+    async function record(action) {
+      const target = current();
+      if (!target) return;
+      buttons.forEach((button) => button.disabled = true);
+      try {
+        const response = await fetch("/api/target", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ brand: currentBrand, row: target.row, action })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Excel 기록에 실패했습니다.");
+        if (action === "sent" && data.drive_sync?.status !== "completed") {
+          toast(data.drive_sync?.message || "로컬 기록은 저장했지만 Drive 원본 최신화가 필요합니다.", true);
+        } else {
+          toast(action === "sent" ? "발송 완료 · Drive 원본까지 최신화했습니다." : "건너뜀으로 기록했습니다.");
+        }
+        await loadDashboard(false);
+        if (action === "sent" && dashboard.message_ready && current()) {
+          await prepare(true);
+        }
+      } catch (error) {
+        toast(error.message, true);
+        render();
+      }
+    }
+
+    $("prepare").addEventListener("click", () => prepare(false));
+    $("copyImage").addEventListener("click", copyReferenceImage);
+    $("sent").addEventListener("click", () => record("sent"));
+    $("skip").addEventListener("click", () => record("skip"));
+    $("next").addEventListener("click", () => {
+      if (!dashboard?.targets?.length) return;
+      index = (index + 1) % dashboard.targets.length;
+      render();
+    });
+    $("refreshDm").addEventListener("click", async () => {
+      const button = $("refreshDm");
+      button.disabled = true;
+      $("syncStatus").textContent = "온라인 최신 명단 확인 중…";
+      try {
+        await loadDashboard(false, true);
+        toast(dashboard?.dm_sync?.message || "최신 명단을 불러왔습니다.");
+      } catch (error) {
+        toast(error.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+    $("pushDm").addEventListener("click", async () => {
+      const button = $("pushDm");
+      button.disabled = true;
+      $("syncStatus").textContent = "발송 기록을 Google Drive 원본에 반영 중…";
+      try {
+        const response = await fetch("/api/dm/sync-drive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}"
+        });
+        const result = await response.json();
+        if (!response.ok || result.status !== "completed") {
+          throw new Error(result.message || "Google Drive 원본 최신화에 실패했습니다.");
+        }
+        $("syncStatus").textContent = result.message;
+        toast(result.message);
+      } catch (error) {
+        $("syncStatus").textContent = error.message;
+        toast(error.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+    document.querySelectorAll(".brand-switch [data-brand]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        currentBrand = button.dataset.brand;
+        localStorage.setItem("dmBrand", currentBrand);
+        index = 0;
+        try {
+          await loadDashboard(false);
+        } catch (error) {
+          toast(error.message, true);
+        }
+      });
+    });
+
+    loadDashboard().catch((error) => {
+      toast(error.message, true);
+      $("handle").textContent = "설정을 확인해주세요";
+    });
+  </script>
+</body>
+</html>
