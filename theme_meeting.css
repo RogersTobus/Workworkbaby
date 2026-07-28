@@ -379,6 +379,10 @@ th {
   border-bottom: 1px solid #e8edf5;
 }
 
+.page-sales .grid {
+  grid-template-columns: 360px minmax(0, 1fr) !important;
+}
+
 .page-sales .contact,
 .page-sales .history-item {
   padding: 14px;
