@@ -219,3 +219,256 @@ textarea:focus,
 .toast {
   background: #17233b !important;
 }
+
+/* Readability and interaction layer */
+body main {
+  padding-bottom: 28px;
+}
+
+header h1,
+.top h1 {
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.nav,
+.master-nav,
+nav {
+  align-items: center;
+  padding: 2px 0 4px;
+}
+
+.nav a,
+.master-nav a,
+nav a {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  transition: color .15s ease, background .15s ease, transform .15s ease;
+}
+
+.nav a:hover,
+.master-nav a:hover,
+nav a:hover {
+  transform: translateY(-1px);
+}
+
+button,
+.btn {
+  min-height: 42px;
+  transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+
+button:not(:disabled):hover,
+.btn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.primary:not(:disabled),
+.start-button:not(:disabled),
+.favorite-start:not(:disabled),
+.proposal-start:not(:disabled),
+.new-button:not(:disabled),
+.ai-button:not(:disabled) {
+  box-shadow: 0 8px 18px rgba(54, 94, 220, .18);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(54, 94, 220, .24);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  font-size: 14px !important;
+}
+
+label,
+.label {
+  color: #58657a !important;
+}
+
+.card,
+.workspace {
+  overflow: clip;
+}
+
+.card h2,
+.workspace h2,
+.workspace h3 {
+  letter-spacing: -.025em;
+}
+
+.rule,
+.kpi,
+.meta div,
+.status-meta div,
+.filter-summary,
+.status-card,
+.current {
+  border: 1px solid #edf0f6;
+}
+
+table tbody tr {
+  transition: background .12s ease;
+}
+
+table tbody tr:hover {
+  background: #f7f9fd;
+}
+
+th {
+  color: #5f6c84 !important;
+  background: #f2f5fa !important;
+}
+
+.page-dm textarea,
+.page-sales .mail-body {
+  line-height: 1.72 !important;
+}
+
+.page-dm .actions,
+.page-sales .actions,
+.page-brand .crawl-actions,
+.page-brand .favorite-actions,
+.page-brand .proposal-actions {
+  align-items: stretch;
+}
+
+.page-dm .stats,
+.page-prices .control,
+.page-prices .status,
+.page-simulation .form,
+.page-simulation .summary,
+.page-memos .editor,
+.page-memos .library {
+  padding: 26px !important;
+}
+
+.page-brand .workspace-head {
+  background: #fbfcfe;
+}
+
+.page-brand .workspace-body {
+  padding-top: 26px;
+}
+
+.page-brand .section-divider {
+  margin: 32px 0;
+}
+
+.page-brand .status-card {
+  padding: 19px;
+}
+
+.page-memos .memo-list {
+  align-items: stretch;
+}
+
+.page-memos .memo-item {
+  min-height: 160px;
+}
+
+.page-sales .composer-head {
+  border-bottom: 1px solid #e8edf5;
+}
+
+.page-sales .contact,
+.page-sales .history-item {
+  padding: 14px;
+}
+
+.page-sales .drop {
+  min-height: 100px;
+  display: grid;
+  place-content: center;
+}
+
+.page-sales .signature {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .8);
+}
+
+@media (max-width: 1280px) {
+  .page-sales .wrap {
+    padding: 24px 20px;
+  }
+
+  .page-sales .grid {
+    grid-template-columns: 290px minmax(0, 1fr) !important;
+  }
+
+  .page-sales .right {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 900px) {
+  .nav,
+  .master-nav,
+  nav {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .nav::-webkit-scrollbar,
+  .master-nav::-webkit-scrollbar,
+  nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav a,
+  .master-nav a,
+  nav a {
+    flex: 0 0 auto;
+  }
+
+  .page-dm main,
+  .page-prices main,
+  .page-simulation main,
+  .page-brand main {
+    width: min(100% - 28px, 1120px) !important;
+    margin-top: 24px !important;
+  }
+
+  .page-brand .status-meta {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .page-sales .grid,
+  .page-sales .right {
+    grid-template-columns: 1fr !important;
+  }
+
+  .page-sales .right {
+    grid-column: auto !important;
+  }
+
+  .page-brand .status-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .page-dm .main-card,
+  .page-prices .control,
+  .page-prices .status,
+  .page-simulation .form,
+  .page-simulation .summary,
+  .page-memos .editor,
+  .page-memos .library,
+  .page-brand .workspace-body,
+  .page-brand .workspace-head {
+    padding: 20px !important;
+  }
+}
