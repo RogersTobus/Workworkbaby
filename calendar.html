@@ -188,7 +188,7 @@
         <h2 id="monthTitle"></h2>
         <div class="toolbar-group">
           <button id="today" type="button">오늘</button>
-          <button id="openEventDialog" class="event-register" type="button">+ 행사 등록</button>
+          <button id="syncEvents" class="event-register" type="button">↻ 행사 최신화</button>
           <button id="nextMonth" type="button">다음 달 →</button>
         </div>
       </div>
@@ -201,7 +201,7 @@
     <aside class="event-strip" aria-label="행사 일정">
       <div class="event-strip-head">
         <span class="event-strip-title">행사 일정</span>
-        <span class="event-sync-note">매일 18:00 자동 최신화</span>
+        <span class="event-sync-note">평일 10:00 · 18:00 자동 최신화</span>
       </div>
       <div id="eventStripList" class="event-strip-list"></div>
     </aside>
@@ -213,36 +213,6 @@
       <div id="workBoard" class="work-board"></div>
     </section>
   </main>
-  <dialog id="eventDialog">
-    <div class="event-dialog-head">
-      <h2>행사 등록</h2>
-      <button id="closeEventDialog" class="dialog-close" type="button" aria-label="행사 등록 닫기">×</button>
-    </div>
-    <form id="eventForm" class="event-form">
-      <label>행사 유형
-        <select id="eventType">
-          <option value="special">특가전</option>
-          <option value="group_buy">공동구매</option>
-          <option value="popup">팝업행사</option>
-        </select>
-      </label>
-      <label>우선순위
-        <select id="eventPriority">
-          <option value="1">★</option>
-          <option value="2">★★</option>
-          <option value="3">★★★</option>
-        </select>
-      </label>
-      <label>행사명 / 브랜드
-        <input id="eventText" type="text" maxlength="200" placeholder="예: 현대톡마트 / 이탈리안커피" required>
-      </label>
-      <div class="event-date-row">
-        <label>시작일<input id="eventStart" type="date" required></label>
-        <label>종료일<input id="eventEnd" type="date" required></label>
-      </div>
-      <button class="event-form-submit" type="submit">행사 등록하기</button>
-    </form>
-  </dialog>
   <dialog id="editTaskDialog">
     <div class="event-dialog-head">
       <h2>일정 수정</h2>
@@ -297,7 +267,6 @@
     const grid = document.getElementById("calendarGrid");
     const board = document.getElementById("workBoard");
     const eventStripList = document.getElementById("eventStripList");
-    const eventDialog = document.getElementById("eventDialog");
     const editTaskDialog = document.getElementById("editTaskDialog");
     const title = document.getElementById("monthTitle");
     const toast = document.getElementById("toast");
@@ -385,6 +354,7 @@
 
     function taskActions(task){
       const actions=document.createElement("div");actions.className="task-actions";
+      if(task.kind==="event"&&task.source==="google_sheet") return actions;
       actions.append(editButton(task),deleteButton(task));
       return actions;
     }
@@ -435,10 +405,12 @@
         content.append(badge);
       }
       const text=document.createElement("span");text.className="task-text";text.textContent=task.text;
-      const priority=document.createElement("span");priority.className="priority-badge";
-      priority.textContent="★".repeat(Number(task.priority)||1);
-      priority.setAttribute("aria-label",`우선순위 ${Number(task.priority)||1}`);
-      content.append(priority);
+      if(task.kind!=="event"){
+        const priority=document.createElement("span");priority.className="priority-badge";
+        priority.textContent="★".repeat(Number(task.priority)||1);
+        priority.setAttribute("aria-label",`우선순위 ${Number(task.priority)||1}`);
+        content.append(priority);
+      }
       content.append(text);
       taskMain.append(content);row.append(taskMain,taskActions(task));return row;
     }
@@ -534,17 +506,16 @@
       }).filter(item=>item.start<=item.end).sort((a,b)=>
         a.start-b.start
         ||a.end-b.end
-        ||String(a.task.created_at).localeCompare(String(b.task.created_at))
+        ||String(a.task.text).localeCompare(String(b.task.text))
       );
       return events;
     }
 
     function activeEventsForDay(events,day){
       return events.filter(event=>event.start<=day&&day<=event.end).sort((a,b)=>
-        (Number(b.task.priority)||1)-(Number(a.task.priority)||1)
-        ||a.start-b.start
+        a.start-b.start
         ||a.end-b.end
-        ||String(a.task.created_at).localeCompare(String(b.task.created_at))
+        ||String(a.task.text).localeCompare(String(b.task.text))
       );
     }
 
@@ -566,9 +537,9 @@
         const dayEvents=nearbyEvents
           .filter(task=>task.event_start<=targetKey&&targetKey<=task.event_end)
           .sort((a,b)=>
-            (Number(b.priority)||1)-(Number(a.priority)||1)
-            ||String(a.event_start).localeCompare(String(b.event_start))
-            ||String(a.created_at).localeCompare(String(b.created_at))
+            String(a.event_start).localeCompare(String(b.event_start))
+            ||String(a.event_end).localeCompare(String(b.event_end))
+            ||String(a.text).localeCompare(String(b.text))
           );
         if(dayEvents.length){
           dayEvents.forEach(task=>{
@@ -594,7 +565,7 @@
           bar.style.gridRow=String(row);
           bar.style.marginTop=`${44+lane*25}px`;
           const text=document.createElement("span");text.className="event-bar-text";
-          text.textContent=`${"★".repeat(Number(event.task.priority)||1)} ${event.task.text}_${shortDate(dateKey(event.start))}~${shortDate(dateKey(event.end))}`;
+          text.textContent=`${event.task.text}_${shortDate(dateKey(event.start))}~${shortDate(dateKey(event.end))}`;
           bar.append(text,taskActions(event.task));grid.append(bar);
       };
       for(let row=1;row<=weekCount;row++){
@@ -688,7 +659,7 @@
           inputRow.append(input,save);
           const optionRow=document.createElement("div");optionRow.className="composer-row";
           const kind=document.createElement("select");kind.dataset.role="kind";kind.setAttribute("aria-label","업무 유형");
-          kind.innerHTML='<option value="task">일반 업무</option><option value="meeting">미팅</option><option value="routine">반복 루틴</option><option value="event">행사</option>';
+          kind.innerHTML='<option value="task">일반 업무</option><option value="meeting">미팅</option><option value="routine">반복 루틴</option>';
           const recurrence=document.createElement("select");recurrence.dataset.role="recurrence";recurrence.setAttribute("aria-label","반복 방식");recurrence.hidden=true;
           recurrence.innerHTML='<option value="daily">매일</option><option value="weekdays">평일</option><option value="weekly" selected>매주</option><option value="monthly">매월</option>';
           const eventEnd=document.createElement("input");eventEnd.type="date";eventEnd.dataset.role="event-end";eventEnd.setAttribute("aria-label","행사 종료일");eventEnd.hidden=true;
@@ -746,31 +717,18 @@
     document.getElementById("today").addEventListener("click",()=>{
       viewDate=new Date(today.getFullYear(),today.getMonth(),1);loadMonth();
     });
-    document.getElementById("openEventDialog").addEventListener("click",()=>{
-      const current=dateKey(today);
-      document.getElementById("eventStart").value=current;
-      document.getElementById("eventEnd").value=current;
-      eventDialog.showModal();document.getElementById("eventText").focus();
-    });
-    document.getElementById("closeEventDialog").addEventListener("click",()=>eventDialog.close());
-    document.getElementById("eventForm").addEventListener("submit",async event=>{
-      event.preventDefault();
-      const text=document.getElementById("eventText").value.trim();
-      const eventType=document.getElementById("eventType").value;
-      const priority=Number(document.getElementById("eventPriority").value);
-      const start=document.getElementById("eventStart").value;
-      const end=document.getElementById("eventEnd").value;
-      const submit=event.currentTarget.querySelector("button[type='submit']");
-      submit.disabled=true;
+    document.getElementById("syncEvents").addEventListener("click",async event=>{
+      const button=event.currentTarget;
+      const original=button.textContent;
+      button.disabled=true;button.textContent="최신화 중…";
       try{
-        await request("/api/calendar/task",{
-          method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({action:"add",date:start,end_date:end,text,kind:"event",event_type:eventType,priority})
+        const result=await request("/api/calendar/sync",{
+          method:"POST",headers:{"Content-Type":"application/json"},body:"{}"
         });
-        event.currentTarget.reset();eventDialog.close();
-        viewDate=new Date(`${start}T00:00:00`);viewDate=new Date(viewDate.getFullYear(),viewDate.getMonth(),1);
-        await loadMonth();showToast("행사를 등록했습니다.");
-      }catch(error){submit.disabled=false;showToast(error.message)}
+        await loadMonth();
+        showToast(`시트 기준 행사 ${result.total}개로 최신화했습니다.`);
+      }catch(error){showToast(error.message)}
+      finally{button.disabled=false;button.textContent=original}
     });
     document.getElementById("editTaskKind").addEventListener("change",syncEditFields);
     document.getElementById("editTaskDate").addEventListener("change",()=>{
