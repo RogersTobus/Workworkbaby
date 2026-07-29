@@ -229,6 +229,31 @@ def save_sales_email_data(data: dict) -> None:
     temporary.replace(SALES_EMAIL_DATA_PATH)
 
 
+def normalize_sales_email_cc(value) -> list[str]:
+    if isinstance(value, str):
+        candidates = re.split(r"[,;\n]+", value)
+    elif isinstance(value, (list, tuple)):
+        candidates = value
+    else:
+        candidates = []
+    addresses = []
+    seen = set()
+    for item in candidates:
+        address = str(item).strip()
+        if not address:
+            continue
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", address):
+            raise ValueError(f"추가 참조 이메일 형식이 올바르지 않습니다: {address}")
+        key = address.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        addresses.append(address[:320])
+        if len(addresses) >= 20:
+            break
+    return addresses
+
+
 def public_sales_email_data() -> dict:
     with SALES_EMAIL_LOCK:
         data = load_sales_email_data()
@@ -288,6 +313,7 @@ def update_sales_email_data(payload: dict) -> dict:
             name = str(payload.get("name", "")).strip()
             subject = str(payload.get("subject", "")).strip()
             body = str(payload.get("body", "")).strip()
+            extra_cc = normalize_sales_email_cc(payload.get("extra_cc", []))
             if not name or not subject or not body:
                 raise ValueError("양식명, 제목, 본문을 모두 입력해주세요.")
             template = next(
@@ -302,6 +328,7 @@ def update_sales_email_data(payload: dict) -> dict:
                     "name": name[:120],
                     "subject": subject[:500],
                     "body": body[:30000],
+                    "extra_cc": extra_cc,
                     "updated_at": now,
                 }
             )
@@ -321,6 +348,7 @@ def update_sales_email_data(payload: dict) -> dict:
                 "template_id": str(payload.get("template_id", "")).strip(),
                 "subject": str(payload.get("subject", "")).strip()[:500],
                 "body": str(payload.get("body", "")).strip()[:30000],
+                "extra_cc": normalize_sales_email_cc(payload.get("extra_cc", [])),
                 "attachments": payload.get("attachments", [])[:20],
                 "updated_at": now,
             }
@@ -343,7 +371,8 @@ def update_sales_email_data(payload: dict) -> dict:
                 "contact_id": contact_id,
                 "contact_name": contact.get("name", ""),
                 "email": contact.get("email", ""),
-                "cc": payload.get("cc", [])[:20],
+                "cc": normalize_sales_email_cc(payload.get("cc", [])),
+                "extra_cc": normalize_sales_email_cc(payload.get("extra_cc", [])),
                 "template_id": str(payload.get("template_id", "")).strip(),
                 "subject": subject[:500],
                 "body": body[:30000],
@@ -358,6 +387,7 @@ def update_sales_email_data(payload: dict) -> dict:
                 "template_id": record["template_id"],
                 "subject": record["subject"],
                 "body": record["body"],
+                "extra_cc": record["extra_cc"],
                 "attachments": record["attachments"],
                 "updated_at": now,
                 "last_sent_at": now,
@@ -422,11 +452,7 @@ def create_outlook_draft(payload: dict) -> dict:
     recipient = str(contact.get("email", "")).strip()
     if not subject or not plain_body or not html_body or not recipient:
         raise ValueError("메일 제목과 본문을 입력해주세요.")
-    cc_addresses = [
-        str(item).strip()
-        for item in payload.get("cc", [])
-        if str(item).strip()
-    ]
+    cc_addresses = normalize_sales_email_cc(payload.get("cc", []))
     attachment_paths = []
     attachment_root = SALES_EMAIL_ATTACHMENTS_DIR.resolve()
     for attachment in payload.get("attachments", [])[:20]:

@@ -41,7 +41,7 @@
     .hint{background:var(--yellow);border:1px solid #f1dfac;color:#735e24;border-radius:13px;padding:11px 13px;font-size:12px}
     .signature{display:grid;grid-template-columns:110px 1fr auto;gap:18px;align-items:end;border:1px solid #dfe5ec;border-radius:16px;background:#fff;padding:20px 18px}
     .signature img{width:88px;height:auto;object-fit:contain;align-self:end}.signature-copy{font-size:12px;line-height:1.6;color:#111}.signature-copy strong{font-size:13px;color:#111}.signature-copy b{display:inline-block;width:15px;color:#111}.signature-copy a{color:#0645d8}.locked{align-self:start;background:#edf2f7;color:#758196;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:800}
-    .fixed-cc{display:flex;gap:8px;align-items:flex-start;border:1px solid #d9e4ef;background:#f4f8fc;border-radius:13px;padding:11px 13px}.fixed-cc b{flex:0 0 auto;color:#315171}.cc-list{display:flex;gap:6px;flex-wrap:wrap}.cc-chip{background:#e3edf8;color:#315171;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700}
+    .fixed-cc{display:grid;gap:10px;border:1px solid #d9e4ef;background:#f4f8fc;border-radius:13px;padding:11px 13px}.fixed-cc-row{display:flex;gap:8px;align-items:flex-start}.fixed-cc b{flex:0 0 auto;color:#315171}.cc-list{display:flex;gap:6px;flex-wrap:wrap}.cc-chip{background:#e3edf8;color:#315171;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700}.extra-cc{grid-template-columns:110px 1fr;align-items:center}.extra-cc input{background:#fff}.extra-cc small{grid-column:2;color:#8290a4;font-weight:500}
     .history{max-height:420px;overflow:auto;padding:8px}.history-item{background:#fafbfd;border-color:#edf0f3;cursor:default}.history-item strong{display:block}.date{font-size:11px;color:#8994a6}
     .empty{padding:34px 18px;text-align:center;color:#96a0b0}.modal{position:fixed;inset:0;background:rgba(16,25,40,.42);display:none;place-items:center;padding:24px;z-index:10}
     .modal.show{display:grid}.modal-box{width:min(520px,100%);background:#fff;border-radius:20px;padding:22px;box-shadow:0 30px 90px rgba(0,0,0,.25)}
@@ -97,9 +97,15 @@
           <button class="btn" id="deleteTemplate">양식 삭제</button>
         </div>
         <div class="fixed-cc">
-          <b>항상 참조(CC)</b>
-          <div class="cc-list"><span class="cc-chip">zach@tobuscorp.com</span><span class="cc-chip">alex@tobuscorp.com</span><span class="cc-chip">jinny@tobuscorp.com</span></div>
-          <span class="locked">고정</span>
+          <div class="fixed-cc-row">
+            <b>항상 참조(CC)</b>
+            <div class="cc-list"><span class="cc-chip">zach@tobuscorp.com</span><span class="cc-chip">alex@tobuscorp.com</span><span class="cc-chip">jinny@tobuscorp.com</span></div>
+            <span class="locked">고정</span>
+          </div>
+          <label class="extra-cc">추가 참조(CC)
+            <input id="extraCc" type="text" placeholder="추가 이메일 입력 · 여러 명은 쉼표로 구분">
+            <small>현재 선택한 메일 양식과 임시 저장본에 함께 저장됩니다.</small>
+          </label>
         </div>
         <div>
           <div class="drop" id="dropZone">
@@ -158,6 +164,8 @@ E Rogers@tobuscorp.com
 T 82.70.4113.4900
 A #1101, GIFC Tower, 240 Kintex-ro, Goyang-si, Republic of Korea`;
   const fixedCc=["zach@tobuscorp.com","alex@tobuscorp.com","jinny@tobuscorp.com"];
+  const extraCc=()=>[...new Set($("#extraCc").value.split(/[,;\n]+/).map(v=>v.trim()).filter(Boolean))];
+  const allCc=()=>[...new Map([...fixedCc,...extraCc()].map(v=>[v.toLowerCase(),v])).values()];
   const fullMailBody=()=>`${$("#body").value.trim()}\n\n${signatureText}`.trim();
   const htmlEscape=s=>String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const signatureHtml=`<table role="presentation" cellpadding="0" cellspacing="0" style="font-family:Arial,'Malgun Gothic',sans-serif;color:#000;font-size:12px"><tr><td style="width:120px;vertical-align:bottom;padding-right:22px"><img src="https://sign.mail.worksmobile.com/signature/logo/kr1/8QbqKoKZKAgqKoKZBqEqKqE./SZbwKAgmKAumFoKmKxg9FApjaAbZKogqKovlFxtmKogq" width="88" alt="TOBUS" style="display:block;border:0"></td><td style="vertical-align:top;line-height:1.5"><b>Young jun Park</b> | 박영준<br>Assistant Manager | 글로벌 e-Biz 매니저<br><br><b>M</b> 82.10.8455.0229<br><br><b>E</b> <a href="mailto:Rogers@tobuscorp.com">Rogers@tobuscorp.com</a><br><br><b>T</b> 82.70.4113.4900<br><br><b>A</b> #1101, GIFC Tower, 240 Kintex-ro, Goyang-si, Republic of Korea</td></tr></table>`;
@@ -194,14 +202,14 @@ A #1101, GIFC Tower, 240 Kintex-ro, Goyang-si, Republic of Korea`;
     selectedId=id;const c=currentContact();if(!c)return;
     fillContact(c);$("#selectedContact").innerHTML=`${esc(c.name)}${c.company?` · ${esc(c.company)}`:""}<small>${esc(c.email)} · 마지막 발송본이 있으면 그대로 불러왔습니다.</small>`;
     const d=store.drafts[id];
-    if(d){$("#subject").value=d.subject||"";$("#body").value=d.body||"";$("#templateSelect").value=d.template_id||"";attachments=[...(d.attachments||[])]}
-    else{$("#subject").value="";$("#body").value="";$("#templateSelect").value="";attachments=[]}
+    if(d){$("#subject").value=d.subject||"";$("#body").value=d.body||"";$("#extraCc").value=(d.extra_cc||[]).join(", ");$("#templateSelect").value=d.template_id||"";attachments=[...(d.attachments||[])]}
+    else{$("#subject").value="";$("#body").value="";$("#extraCc").value="";$("#templateSelect").value="";attachments=[]}
     renderContacts();renderFiles();renderHistory();
   }
   function merge(text,c){return String(text||"").replaceAll("{{담당자명}}",c.name||"").replaceAll("{{회사명}}",c.company||"").replaceAll("{{플랫폼}}",c.platform||"")}
   async function saveDraft(silent=false){
     const c=currentContact();if(!c)throw Error("연락처를 먼저 선택해주세요.");
-    const result=await api({action:"save_draft",contact_id:c.id,template_id:$("#templateSelect").value,subject:$("#subject").value,body:$("#body").value,attachments});
+    const result=await api({action:"save_draft",contact_id:c.id,template_id:$("#templateSelect").value,subject:$("#subject").value,body:$("#body").value,extra_cc:extraCc(),attachments});
     store.drafts[c.id]=result.draft;if(!silent)toast("임시 저장했습니다.");
   }
   async function load(){
@@ -210,19 +218,19 @@ A #1101, GIFC Tower, 240 Kintex-ro, Goyang-si, Republic of Korea`;
     if(store.contacts.length)selectContact(store.contacts[0].id);
   }
   $("#contactSearch").oninput=renderContacts;
-  $("#newContact").onclick=()=>{selectedId="";fillContact();$("#selectedContact").innerHTML=`새 연락처<small>정보를 입력하고 저장해주세요.</small>`;renderContacts();renderHistory()};
+  $("#newContact").onclick=()=>{selectedId="";fillContact();$("#extraCc").value="";$("#selectedContact").innerHTML=`새 연락처<small>정보를 입력하고 저장해주세요.</small>`;renderContacts();renderHistory()};
   $("#saveContact").onclick=async()=>{try{const existing=currentContact();const r=await api({action:"save_contact",id:$("#contactId").value,name:$("#contactName").value,company:$("#contactCompany").value,email:$("#contactEmail").value,platform:existing?.platform||"",memo:$("#contactMemo").value});const i=store.contacts.findIndex(x=>x.id===r.contact.id);if(i>=0)store.contacts[i]=r.contact;else store.contacts.push(r.contact);selectContact(r.contact.id);toast("연락처를 저장했습니다.")}catch(e){toast(e.message)}};
   $("#deleteContact").onclick=async()=>{if(!selectedId||!confirm("이 연락처를 삭제할까요?"))return;try{await api({action:"delete_contact",id:selectedId});store.contacts=store.contacts.filter(x=>x.id!==selectedId);delete store.drafts[selectedId];selectedId="";fillContact();renderContacts();renderHistory();toast("삭제했습니다.")}catch(e){toast(e.message)}};
-  $("#templateSelect").onchange=()=>{const t=store.templates.find(x=>x.id===$("#templateSelect").value),c=currentContact();if(t&&c){$("#subject").value=merge(t.subject,c);$("#body").value=merge(t.body,c)}};
+  $("#templateSelect").onchange=()=>{const t=store.templates.find(x=>x.id===$("#templateSelect").value),c=currentContact();if(t&&c){$("#subject").value=merge(t.subject,c);$("#body").value=merge(t.body,c);$("#extraCc").value=(t.extra_cc||[]).join(", ")}};
   $("#saveTemplate").onclick=()=>{$("#templateName").value=store.templates.find(x=>x.id===$("#templateSelect").value)?.name||"";$("#templateModal").classList.add("show")};
   $("#cancelTemplate").onclick=()=>$("#templateModal").classList.remove("show");
-  $("#confirmTemplate").onclick=async()=>{try{const r=await api({action:"save_template",id:$("#templateSelect").value,name:$("#templateName").value,subject:$("#subject").value,body:$("#body").value});const i=store.templates.findIndex(x=>x.id===r.template.id);if(i>=0)store.templates[i]=r.template;else store.templates.push(r.template);renderTemplates();$("#templateSelect").value=r.template.id;$("#templateModal").classList.remove("show");toast("메일 양식을 저장했습니다.")}catch(e){toast(e.message)}};
+  $("#confirmTemplate").onclick=async()=>{try{const r=await api({action:"save_template",id:$("#templateSelect").value,name:$("#templateName").value,subject:$("#subject").value,body:$("#body").value,extra_cc:extraCc()});const i=store.templates.findIndex(x=>x.id===r.template.id);if(i>=0)store.templates[i]=r.template;else store.templates.push(r.template);renderTemplates();$("#templateSelect").value=r.template.id;$("#templateModal").classList.remove("show");toast("추가 참조를 포함해 메일 양식을 저장했습니다.")}catch(e){toast(e.message)}};
   $("#deleteTemplate").onclick=async()=>{const id=$("#templateSelect").value;if(!id||!confirm("이 메일 양식을 삭제할까요?"))return;try{await api({action:"delete_template",id});store.templates=store.templates.filter(x=>x.id!==id);renderTemplates();toast("양식을 삭제했습니다.")}catch(e){toast(e.message)}};
   $("#saveDraft").onclick=()=>saveDraft().catch(e=>toast(e.message));
   const dz=$("#dropZone"),fi=$("#fileInput");dz.onclick=()=>fi.click();["dragenter","dragover"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.add("drag")}));["dragleave","drop"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.remove("drag")}));dz.ondrop=e=>uploadFiles(e.dataTransfer.files);fi.onchange=()=>uploadFiles(fi.files);
   async function uploadFiles(files){for(const file of files){try{const r=await fetch(`/api/sales-email/attachments?filename=${encodeURIComponent(file.name)}`,{method:"POST",headers:{"Content-Type":file.type||"application/octet-stream"},body:file});const j=await r.json();if(!r.ok)throw Error(j.error||"첨부 실패");attachments.push(j.attachment);renderFiles()}catch(e){toast(e.message)}}fi.value=""}
-  $("#openOutlook").onclick=async()=>{try{const c=currentContact();if(!c)throw Error("연락처를 먼저 선택해주세요.");await saveDraft(true);const r=await fetch("/api/sales-email/outlook-draft",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contact_id:c.id,cc:fixedCc,subject:$("#subject").value,full_body:fullMailBody(),full_html:fullMailHtml(),attachments})});const j=await r.json();if(!r.ok)throw Error(j.error||"Outlook 작성 팝업을 열지 못했습니다.");toast(j.message)}catch(e){toast(e.message)}};
-  $("#recordSent").onclick=async()=>{try{const c=currentContact();if(!c)throw Error("연락처를 먼저 선택해주세요.");if(!confirm(`${c.name}님에게 보낸 메일로 기록할까요?`))return;const r=await api({action:"record_sent",contact_id:c.id,cc:fixedCc,template_id:$("#templateSelect").value,subject:$("#subject").value,body:$("#body").value,full_body:fullMailBody(),full_html:fullMailHtml(),attachments});store.history.unshift(r.record);store.drafts[c.id]={contact_id:c.id,template_id:r.record.template_id,subject:r.record.subject,body:r.record.body,attachments:r.record.attachments,updated_at:r.record.sent_at,last_sent_at:r.record.sent_at};renderHistory();toast("고정 참조와 HTML 서명을 포함한 발송 이력을 기록했습니다.")}catch(e){toast(e.message)}};
+  $("#openOutlook").onclick=async()=>{try{const c=currentContact();if(!c)throw Error("연락처를 먼저 선택해주세요.");await saveDraft(true);const r=await fetch("/api/sales-email/outlook-draft",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contact_id:c.id,cc:allCc(),subject:$("#subject").value,full_body:fullMailBody(),full_html:fullMailHtml(),attachments})});const j=await r.json();if(!r.ok)throw Error(j.error||"Outlook 작성 팝업을 열지 못했습니다.");toast(j.message)}catch(e){toast(e.message)}};
+  $("#recordSent").onclick=async()=>{try{const c=currentContact();if(!c)throw Error("연락처를 먼저 선택해주세요.");if(!confirm(`${c.name}님에게 보낸 메일로 기록할까요?`))return;const r=await api({action:"record_sent",contact_id:c.id,cc:allCc(),extra_cc:extraCc(),template_id:$("#templateSelect").value,subject:$("#subject").value,body:$("#body").value,full_body:fullMailBody(),full_html:fullMailHtml(),attachments});store.history.unshift(r.record);store.drafts[c.id]={contact_id:c.id,template_id:r.record.template_id,subject:r.record.subject,body:r.record.body,extra_cc:r.record.extra_cc||[],attachments:r.record.attachments,updated_at:r.record.sent_at,last_sent_at:r.record.sent_at};renderHistory();toast("참조와 HTML 서명을 포함한 발송 이력을 기록했습니다.")}catch(e){toast(e.message)}};
   load().catch(e=>toast(e.message));
 </script>
 </body>
