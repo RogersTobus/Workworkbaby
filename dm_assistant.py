@@ -82,6 +82,7 @@ DM_REFERENCE_IMAGES = {
     "gaia": DM_REFERENCE_IMAGE_DIR / "가이아_공동구매_구성제안.png",
     "alp": DM_REFERENCE_IMAGE_DIR / "알프_공동구매_구성안.png",
 }
+DM_TEMPLATE_OVERRIDES_PATH = APP_DIR / "app_data" / "dm_template_overrides.json"
 MEETING_RECORDINGS_DIR = APP_DIR / "meeting_recordings"
 LOCAL_WHISPER_DIR = Path(
     os.environ.get(
@@ -117,6 +118,7 @@ SIMULATION_MANAGER = SimulationManager(
 )
 LOCK = threading.Lock()
 DM_SYNC_LOCK = threading.Lock()
+DM_TEMPLATE_LOCK = threading.Lock()
 CALENDAR_LOCK = threading.Lock()
 CALENDAR_SYNC_LOCK = threading.Lock()
 MEETING_NOTES_LOCK = threading.Lock()
@@ -2065,8 +2067,97 @@ def parse_sheet_date(value: object) -> date | None:
     return None
 
 
-def format_message(brand: dict, instagram_id: str) -> str:
-    template = brand["message_template"]
+def load_dm_template_overrides() -> dict[str, str]:
+    with DM_TEMPLATE_LOCK:
+        if not DM_TEMPLATE_OVERRIDES_PATH.exists():
+            return {}
+        try:
+            raw = json.loads(
+                DM_TEMPLATE_OVERRIDES_PATH.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            return {}
+        if not isinstance(raw, dict):
+            return {}
+        return {
+            str(key): str(value)
+            for key, value in raw.items()
+            if isinstance(value, str)
+        }
+
+
+def get_dm_message_template(brand_key: str, brand: dict) -> str:
+    overrides = load_dm_template_overrides()
+    return overrides.get(brand_key, str(brand["message_template"]))
+
+
+def save_dm_message_template(brand_key: str, template: str) -> dict:
+    if brand_key not in CONFIG["brands"]:
+        raise ValueError("지원하지 않는 브랜드입니다.")
+    if not isinstance(template, str):
+        raise ValueError("DM 문구를 입력해주세요.")
+    template = template.strip()
+    if not template:
+        raise ValueError("DM 문구를 비워둘 수 없습니다.")
+    if len(template) > 20000:
+        raise ValueError("DM 문구는 20,000자 이내로 저장해주세요.")
+    with DM_TEMPLATE_LOCK:
+        overrides: dict[str, str] = {}
+        if DM_TEMPLATE_OVERRIDES_PATH.exists():
+            try:
+                raw = json.loads(
+                    DM_TEMPLATE_OVERRIDES_PATH.read_text(encoding="utf-8")
+                )
+                if isinstance(raw, dict):
+                    overrides = {
+                        str(key): str(value)
+                        for key, value in raw.items()
+                        if isinstance(value, str)
+                    }
+            except (OSError, json.JSONDecodeError):
+                pass
+        overrides[brand_key] = template
+        DM_TEMPLATE_OVERRIDES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temporary = DM_TEMPLATE_OVERRIDES_PATH.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(overrides, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temporary.replace(DM_TEMPLATE_OVERRIDES_PATH)
+    return {"ok": True, "brand": brand_key, "template": template}
+
+
+def reset_dm_message_template(brand_key: str) -> dict:
+    if brand_key not in CONFIG["brands"]:
+        raise ValueError("지원하지 않는 브랜드입니다.")
+    with DM_TEMPLATE_LOCK:
+        overrides: dict[str, str] = {}
+        if DM_TEMPLATE_OVERRIDES_PATH.exists():
+            try:
+                raw = json.loads(
+                    DM_TEMPLATE_OVERRIDES_PATH.read_text(encoding="utf-8")
+                )
+                if isinstance(raw, dict):
+                    overrides = {
+                        str(key): str(value)
+                        for key, value in raw.items()
+                        if isinstance(value, str)
+                    }
+            except (OSError, json.JSONDecodeError):
+                pass
+        overrides.pop(brand_key, None)
+        DM_TEMPLATE_OVERRIDES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temporary = DM_TEMPLATE_OVERRIDES_PATH.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(overrides, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temporary.replace(DM_TEMPLATE_OVERRIDES_PATH)
+    template = str(CONFIG["brands"][brand_key]["message_template"])
+    return {"ok": True, "brand": brand_key, "template": template}
+
+
+def format_message(template: str, instagram_id: str) -> str:
     if template == "__MESSAGE_REQUIRED__":
         return ""
     return template.replace("{instagram_id}", instagram_id)
@@ -2390,9 +2481,15 @@ def get_dashboard(brand_key: str, force_sync: bool = False) -> dict:
                             "instagram_id": creator,
                             "topic": topic,
                             "profile_url": profile_url,
-                            "message": format_message(brand, creator),
+                            "message": "",
                         }
                     )
+
+            message_template = get_dm_message_template(brand_key, brand)
+            for target in pending:
+                target["message"] = format_message(
+                    message_template, target["instagram_id"]
+                )
 
             return {
                 "brand_key": brand_key,
@@ -2401,7 +2498,8 @@ def get_dashboard(brand_key: str, force_sync: bool = False) -> dict:
                 "theme": brand["theme"],
                 "expected_account": brand["expected_account"],
                 "login_note": brand["login_note"],
-                "message_ready": brand["message_template"] != "__MESSAGE_REQUIRED__",
+                "message_ready": message_template != "__MESSAGE_REQUIRED__",
+                "editable_message_template": message_template,
                 "sheet": brand["sheet_name"],
                 "workbook": CONFIG["_workbook_path"].name,
                 "goal": brand["weekly_goal"],
@@ -3501,6 +3599,18 @@ class RequestHandler(BaseHTTPRequestHandler):
                 row = int(payload["row"])
                 action = str(payload["action"])
                 self.send_json(update_target(brand_key, row, action))
+            elif path == "/api/dm/template":
+                brand_key = str(payload.get("brand", "")).strip()
+                action = str(payload.get("action", "save")).strip()
+                if action == "reset":
+                    self.send_json(reset_dm_message_template(brand_key))
+                else:
+                    self.send_json(
+                        save_dm_message_template(
+                            brand_key,
+                            str(payload.get("template", "")),
+                        )
+                    )
             elif path == "/api/dm/sync-drive":
                 self.send_json(upload_dm_workbook_to_drive())
             elif path == "/api/brand-connecting/crawl/start":

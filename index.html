@@ -123,10 +123,20 @@
     .handle { font-size: 30px; font-weight: 850; letter-spacing: -.035em; margin: 5px 0; word-break: break-all; }
     .position { color: var(--muted); font-size: 14px; white-space: nowrap; }
     textarea {
-      margin: 20px 0 16px; width: 100%; min-height: 390px; resize: vertical;
+      margin: 20px 0 8px; width: 100%; min-height: 390px; resize: vertical;
       border: 1px solid var(--line); border-radius: 15px; background: #fbfcfb;
       padding: 18px; font: 15px/1.62 "Segoe UI", "Malgun Gothic", sans-serif; color: var(--ink);
     }
+    textarea.dirty { border-color: var(--lime); box-shadow: 0 0 0 3px rgba(205, 228, 102, .2); }
+    .message-editor-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-bottom: 16px; padding: 10px 12px; border-radius: 12px;
+      background: #f5f8f6; color: var(--muted); font-size: 12px;
+    }
+    .message-editor-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .message-editor-actions button { padding: 9px 12px; font-size: 12px; }
+    .message-save { color: white; background: var(--green); }
+    .message-reset { color: var(--muted); background: white; border: 1px solid var(--line); }
     .actions { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; }
     button {
       border: 0; border-radius: 13px; padding: 14px 16px; cursor: pointer;
@@ -159,6 +169,7 @@
       .actions { grid-template-columns: 1fr; }
       .dm-toolbar { align-items: stretch; flex-direction: column; }
       .sync-group { justify-content: space-between; }
+      .message-editor-bar { align-items: stretch; flex-direction: column; }
     }
   </style>
   <link rel="stylesheet" href="/theme-meeting.css">
@@ -203,6 +214,13 @@
           <div id="position" class="position"></div>
         </div>
         <textarea id="message" aria-label="DM 문구"></textarea>
+        <div class="message-editor-bar">
+          <span id="messageSaveStatus">문구를 수정한 뒤 저장하면 다음 대상과 재실행에도 유지됩니다.</span>
+          <div class="message-editor-actions">
+            <button id="resetMessage" type="button" class="message-reset">기본 문구 복원</button>
+            <button id="saveMessage" type="button" class="message-save">DM 문구 저장</button>
+          </div>
+        </div>
         <div id="referenceCard" class="reference-card">
           <img id="referenceImage" alt="공동구매 구성안 미리보기">
           <div class="reference-info">
@@ -253,6 +271,7 @@
     let index = 0;
     let currentBrand = localStorage.getItem("dmBrand") || "alp";
     let dashboardRequestId = 0;
+    const messageDrafts = {};
     const instagramWorkspaceName = "instagram_dm_workspace";
     let instagramTab = null;
 
@@ -270,6 +289,31 @@
       return dashboard?.targets?.[index] || null;
     }
 
+    function templateForCurrentBrand() {
+      return Object.prototype.hasOwnProperty.call(messageDrafts, currentBrand)
+        ? messageDrafts[currentBrand]
+        : (dashboard?.editable_message_template || "");
+    }
+
+    function renderTemplate(template, instagramId) {
+      return String(template || "").replaceAll("{instagram_id}", instagramId || "");
+    }
+
+    function editedMessageToTemplate(message, instagramId) {
+      const value = String(message || "");
+      if (!instagramId || value.includes("{instagram_id}")) return value;
+      return value.replace(instagramId, "{instagram_id}");
+    }
+
+    function syncMessageEditorState() {
+      const dirty = Object.prototype.hasOwnProperty.call(messageDrafts, currentBrand);
+      $("message").classList.toggle("dirty", dirty);
+      $("messageSaveStatus").textContent = dirty
+        ? "저장하지 않은 변경사항이 있습니다. 대상이나 브랜드를 바꿔도 초안은 유지됩니다."
+        : "저장됨 · 다음 대상과 앱 재실행에도 같은 문구가 적용됩니다.";
+      $("saveMessage").disabled = !dirty;
+    }
+
     function render() {
       const target = current();
       const hasTarget = Boolean(target);
@@ -284,8 +328,9 @@
       $("eyebrow").textContent = dashboard.eyebrow;
       $("handle").textContent = hasTarget ? `@${target.instagram_id}` : "대기 대상이 없습니다";
       $("message").value = hasTarget
-        ? (dashboard.message_ready ? target.message : "가이아 DM 문구는 아직 설정되지 않았습니다.")
-        : "";
+        ? renderTemplate(templateForCurrentBrand(), target.instagram_id)
+        : renderTemplate(templateForCurrentBrand(), "");
+      syncMessageEditorState();
       const hasReferenceImage = Boolean(dashboard.reference_image_url);
       $("referenceCard").style.display = hasReferenceImage ? "flex" : "none";
       $("referenceImage").src = hasReferenceImage ? dashboard.reference_image_url : "";
@@ -330,6 +375,40 @@
       if (!preserveIndex) index = 0;
       if (index >= dashboard.targets.length) index = Math.max(0, dashboard.targets.length - 1);
       render();
+    }
+
+    async function saveMessageTemplate(action = "save") {
+      const target = current();
+      let template = templateForCurrentBrand();
+      if (action === "save") {
+        template = editedMessageToTemplate(
+          $("message").value,
+          target?.instagram_id || ""
+        );
+      }
+      $("saveMessage").disabled = true;
+      $("resetMessage").disabled = true;
+      try {
+        const response = await fetch("/api/dm/template", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ brand: currentBrand, action, template })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "DM 문구를 저장하지 못했습니다.");
+        dashboard.editable_message_template = result.template;
+        dashboard.message_ready = true;
+        delete messageDrafts[currentBrand];
+        render();
+        toast(action === "reset"
+          ? `${dashboard.brand_name} 기본 DM 문구로 복원했습니다.`
+          : `${dashboard.brand_name} DM 문구를 저장했습니다.`);
+      } catch (error) {
+        toast(error.message, true);
+        syncMessageEditorState();
+      } finally {
+        $("resetMessage").disabled = false;
+      }
     }
 
     async function openInstagramWorkspace(profileUrl) {
@@ -424,6 +503,20 @@
     }
 
     $("prepare").addEventListener("click", () => prepare(false));
+    $("message").addEventListener("input", () => {
+      const target = current();
+      messageDrafts[currentBrand] = editedMessageToTemplate(
+        $("message").value,
+        target?.instagram_id || ""
+      );
+      syncMessageEditorState();
+    });
+    $("saveMessage").addEventListener("click", () => saveMessageTemplate("save"));
+    $("resetMessage").addEventListener("click", () => {
+      if (confirm(`${dashboard?.brand_name || ""} DM 문구를 기본값으로 복원할까요?`)) {
+        saveMessageTemplate("reset");
+      }
+    });
     $("copyImage").addEventListener("click", copyReferenceImage);
     $("sent").addEventListener("click", () => record("sent"));
     $("skip").addEventListener("click", () => record("skip"));
