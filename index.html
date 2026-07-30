@@ -148,6 +148,21 @@
     .sent { background: var(--lime); color: #1a291e; }
     .skip { background: #edf1ee; color: #435149; }
     .secondary { width: 100%; margin-top: 10px; background: white; color: var(--green); border: 1px solid #b9cbc1; }
+    .auto-control {
+      margin-top: 18px; padding: 16px; border: 1px solid var(--line);
+      border-radius: 16px; background: #f7faf8;
+    }
+    .auto-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .auto-title { font-size: 15px; font-weight: 850; }
+    .auto-actions { display: grid; grid-template-columns: 1.4fr .8fr; gap: 9px; margin-top: 12px; }
+    .auto-start { color: white; background: var(--green); }
+    .auto-stop { color: #9e3d2e; background: #fff0ed; border: 1px solid #f3cbc3; }
+    .auto-progress { margin-top: 12px; }
+    .auto-progress .progress { margin: 7px 0; }
+    .auto-detail { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .auto-error { color: #9e3d2e; }
     .kpi { display: flex; align-items: baseline; gap: 7px; margin-top: 8px; }
     .kpi strong { font-size: 36px; letter-spacing: -.05em; }
     .progress { height: 10px; border-radius: 99px; background: #e9eeeb; overflow: hidden; margin: 14px 0 8px; }
@@ -181,7 +196,7 @@
         <div id="eyebrow" class="eyebrow">WEEKLY OUTREACH</div>
         <h1>Instagram DM 도우미</h1>
       </div>
-      <div class="safe">최종 보내기 버튼은 자동 클릭하지 않습니다</div>
+      <div class="safe">자동 발송 전 브랜드 계정을 확인합니다</div>
     </header>
     <nav class="master-nav" aria-label="업무 메뉴">
       <a href="/brand-connecting">브랜드 커넥팅</a>
@@ -235,6 +250,24 @@
           <button id="skip" class="skip">건너뛰기</button>
         </div>
         <button id="next" class="secondary">기록 없이 다음 대상</button>
+        <section class="auto-control" aria-label="목표 자동 발송">
+          <div class="auto-head">
+            <div>
+              <div class="auto-title">주간 목표까지 자동 발송</div>
+              <div class="auto-detail">남은 목표만큼 문구·구성안 발송과 시트 기록을 순차 진행합니다.</div>
+            </div>
+            <b id="autoBadge">대기</b>
+          </div>
+          <div class="auto-actions">
+            <button id="autoStart" type="button" class="auto-start">목표까지 자동 발송</button>
+            <button id="autoStop" type="button" class="auto-stop" disabled>중단</button>
+          </div>
+          <div id="autoProgress" class="auto-progress" hidden>
+            <div class="progress"><div id="autoBar"></div></div>
+            <div id="autoMessage" class="auto-detail"></div>
+            <div id="autoError" class="auto-detail auto-error"></div>
+          </div>
+        </section>
       </section>
 
       <aside class="side">
@@ -274,6 +307,8 @@
     const messageDrafts = {};
     const instagramWorkspaceName = "instagram_dm_workspace";
     let instagramTab = null;
+    let autoState = null;
+    let lastAutoStatus = "";
 
     const $ = (id) => document.getElementById(id);
     const buttons = ["prepare", "sent", "skip", "next", "copyImage"].map($);
@@ -359,6 +394,107 @@
       const sync = dashboard.dm_sync || {};
       $("syncStatus").textContent = sync.message || "온라인 명단 확인 전";
       $("bar").style.width = `${Math.min(100, dashboard.weekly_sent / dashboard.goal * 100)}%`;
+      renderAutoState();
+    }
+
+    function autoIsRunning() {
+      return ["queued", "running", "stopping", "login_required", "account_required"]
+        .includes(autoState?.status);
+    }
+
+    function renderAutoState() {
+      if (!dashboard) return;
+      const state = autoState || { status: "idle", completed: 0, requested: 0 };
+      const running = autoIsRunning();
+      const waitingForAccount = ["login_required", "account_required"].includes(state.status);
+      const belongsToBrand = !state.brand || state.brand === currentBrand;
+      const goalDone = Number(dashboard.remaining_to_goal || 0) <= 0;
+      $("autoStart").disabled = goalDone || (running && !waitingForAccount);
+      $("autoStart").textContent = goalDone
+        ? "이번 주 목표 달성"
+        : (waitingForAccount ? "로그인·계정 확인 후 계속" : "목표까지 자동 발송");
+      $("autoStop").disabled = !running;
+      $("autoProgress").hidden = state.status === "idle";
+      const completed = Number(state.completed || 0);
+      const requested = Number(state.requested || 0);
+      $("autoBar").style.width = `${requested ? Math.min(100, completed / requested * 100) : 0}%`;
+      $("autoBadge").textContent = ({
+        idle: "대기",
+        queued: "준비 중",
+        running: "발송 중",
+        login_required: "로그인 필요",
+        account_required: "계정 전환 필요",
+        stopping: "중단 중",
+        stopped: "중단됨",
+        completed: "완료",
+        completed_with_errors: "일부 실패",
+        error: "오류"
+      })[state.status] || state.status || "대기";
+      $("autoMessage").textContent = belongsToBrand
+        ? `${state.message || ""}${requested ? ` · ${completed}/${requested}명` : ""}`
+        : `${state.expected_account || "다른 브랜드"} 자동 발송이 진행 중입니다.`;
+      $("autoError").textContent = state.last_error || "";
+      buttons.forEach((button) => {
+        if (running) button.disabled = true;
+      });
+      document.querySelectorAll(".brand-switch [data-brand]").forEach((button) => {
+        button.disabled = running;
+      });
+    }
+
+    async function fetchAutoStatus() {
+      try {
+        const response = await fetch("/api/dm/auto/status", { cache: "no-store" });
+        const nextState = await response.json();
+        if (!response.ok) throw new Error(nextState.error || "자동 발송 상태를 확인하지 못했습니다.");
+        const previousStatus = lastAutoStatus;
+        autoState = nextState;
+        lastAutoStatus = nextState.status || "";
+        renderAutoState();
+        if (
+          previousStatus &&
+          ["queued", "running", "stopping", "login_required", "account_required"].includes(previousStatus) &&
+          ["stopped", "completed", "completed_with_errors", "error"].includes(nextState.status)
+        ) {
+          await loadDashboard(false);
+        }
+      } catch (error) {
+        $("autoError").textContent = error.message;
+      }
+    }
+
+    async function postAuto(path, payload = {}) {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "자동 발송 요청에 실패했습니다.");
+      autoState = result;
+      lastAutoStatus = result.status || "";
+      renderAutoState();
+      return result;
+    }
+
+    async function startOrResumeAuto() {
+      try {
+        if (["login_required", "account_required"].includes(autoState?.status)) {
+          await postAuto("/api/dm/auto/resume");
+          return;
+        }
+        if (!dashboard || dashboard.remaining_to_goal <= 0) {
+          throw new Error("이번 주 목표를 이미 달성했습니다.");
+        }
+        const confirmed = confirm(
+          `${dashboard.expected_account} 계정으로 남은 ${dashboard.remaining_to_goal}명에게 ` +
+          "DM 문구와 구성안 이미지를 자동 발송하고 시트에 기록할까요?"
+        );
+        if (!confirmed) return;
+        await postAuto("/api/dm/auto/start", { brand: currentBrand });
+      } catch (error) {
+        toast(error.message, true);
+      }
     }
 
     async function loadDashboard(preserveIndex = false, forceSync = false) {
@@ -518,6 +654,14 @@
       }
     });
     $("copyImage").addEventListener("click", copyReferenceImage);
+    $("autoStart").addEventListener("click", startOrResumeAuto);
+    $("autoStop").addEventListener("click", async () => {
+      try {
+        await postAuto("/api/dm/auto/stop");
+      } catch (error) {
+        toast(error.message, true);
+      }
+    });
     $("sent").addEventListener("click", () => record("sent"));
     $("skip").addEventListener("click", () => record("skip"));
     $("next").addEventListener("click", () => {
@@ -578,6 +722,8 @@
       toast(error.message, true);
       $("handle").textContent = "설정을 확인해주세요";
     });
+    fetchAutoStatus();
+    setInterval(fetchAutoStatus, 1500);
   </script>
 </body>
 </html>

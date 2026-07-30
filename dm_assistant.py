@@ -40,6 +40,7 @@ from brand_connect_sheet import (
     set_proposal_date_if_blank,
 )
 from dm_templates import DM_MESSAGE_TEMPLATES
+from instagram_dm_sender import InstagramDMSenderManager
 from price_updater import PriceUpdateManager
 from simulation_manager import SimulationManager
 
@@ -3339,6 +3340,15 @@ def update_target(brand_key: str, row: int, action: str) -> dict:
             workbook.close()
 
 
+INSTAGRAM_DM_SENDER = InstagramDMSenderManager(
+    APP_DIR,
+    get_dashboard,
+    update_target,
+    CONFIG["brands"],
+    DM_REFERENCE_IMAGES,
+)
+
+
 class RequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format_string: str, *args) -> None:
         return
@@ -3479,6 +3489,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, "brands": list(CONFIG["brands"])})
             elif path == "/api/prices/status":
                 self.send_json(PRICE_MANAGER.snapshot())
+            elif path == "/api/dm/auto/status":
+                self.send_json(INSTAGRAM_DM_SENDER.snapshot())
             elif path == "/api/calendar":
                 month = parse_qs(parsed.query).get(
                     "month", [date.today().strftime("%Y-%m")]
@@ -3613,6 +3625,16 @@ class RequestHandler(BaseHTTPRequestHandler):
                     )
             elif path == "/api/dm/sync-drive":
                 self.send_json(upload_dm_workbook_to_drive())
+            elif path == "/api/dm/auto/start":
+                self.send_json(
+                    INSTAGRAM_DM_SENDER.start(
+                        str(payload.get("brand", "")).strip()
+                    )
+                )
+            elif path == "/api/dm/auto/resume":
+                self.send_json(INSTAGRAM_DM_SENDER.resume_after_login())
+            elif path == "/api/dm/auto/stop":
+                self.send_json(INSTAGRAM_DM_SENDER.stop())
             elif path == "/api/brand-connecting/crawl/start":
                 if (
                     BRAND_CONNECT_FAVORITE_MANAGER.is_running()
