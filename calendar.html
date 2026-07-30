@@ -103,6 +103,25 @@
     .group-buy .event-card-period{color:#806594}
     .popup-event .event-card-period{color:#63855a}
     .event-day-empty{padding:14px 4px;text-align:center;color:#a0a7b2;font-size:11px}
+    .routine-shell{margin-top:24px;background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);padding:18px 20px}
+    .routine-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:13px}
+    .routine-title-wrap{display:flex;align-items:baseline;gap:9px}
+    .routine-heading h2{margin:0;font-size:19px;letter-spacing:-.03em}
+    .routine-note{color:var(--muted);font-size:11px}
+    .routine-add{border:0;border-radius:10px;background:var(--blue);color:#fff;padding:9px 13px;font-size:12px;font-weight:850;cursor:pointer}
+    .routine-list{display:flex;gap:9px;overflow-x:auto;padding:1px 1px 5px;scrollbar-width:thin}
+    .routine-card{flex:0 0 auto;min-width:190px;max-width:290px;display:flex;align-items:center;gap:9px;border:1px solid #dce4f1;border-radius:12px;background:#f7f9ff;padding:10px 11px}
+    .routine-card.completed{background:#f2f3f5;color:#969daa}
+    .routine-check{appearance:none;width:19px;height:19px;flex:0 0 19px;margin:0;border:2px solid #9bacd4;border-radius:6px;background:#fff;display:grid;place-items:center;cursor:pointer}
+    .routine-check:checked{border-color:var(--blue);background:var(--blue)}
+    .routine-check:checked::after{content:"✓";color:#fff;font-size:13px;font-weight:900;line-height:1}
+    .routine-copy{min-width:0;flex:1}
+    .routine-text{font-size:13px;font-weight:800;line-height:1.35;overflow-wrap:anywhere}
+    .routine-card.completed .routine-text{text-decoration:line-through}
+    .routine-cycle{margin-top:2px;color:#71809a;font-size:10px;font-weight:750}
+    .routine-remove{width:24px;height:24px;flex:0 0 auto;border:0;border-radius:7px;background:transparent;color:#a2aaba;font-size:16px;cursor:pointer}
+    .routine-remove:hover{background:#ffe8e9;color:#c94e59}
+    .routine-empty{width:100%;padding:13px;text-align:center;border:1px dashed #d9e0ec;border-radius:12px;color:#98a1b1;font-size:12px}
     [hidden]{display:none!important}
     dialog{width:min(460px,calc(100% - 28px));border:0;border-radius:20px;padding:0;box-shadow:0 28px 80px rgba(20,30,55,.28)}
     dialog::backdrop{background:rgba(18,27,46,.42);backdrop-filter:blur(2px)}
@@ -163,6 +182,7 @@
       .board-heading{align-items:flex-start;flex-direction:column}
       .event-strip-list{display:flex;overflow-x:auto}
       .event-day-column{flex:0 0 min(76vw,270px)}
+      .routine-heading{align-items:flex-start}.routine-title-wrap{display:block}.routine-note{display:block;margin-top:3px}
     }
   </style>
 </head>
@@ -205,6 +225,16 @@
       </div>
       <div id="eventStripList" class="event-strip-list"></div>
     </aside>
+    <section class="routine-shell" aria-labelledby="routineTitle">
+      <div class="routine-heading">
+        <div class="routine-title-wrap">
+          <h2 id="routineTitle">데일리 루틴</h2>
+          <span class="routine-note">매일은 다음 날, 매주는 새 주가 시작되면 체크가 자동으로 풀립니다.</span>
+        </div>
+        <button id="addRoutine" class="routine-add" type="button">+ 루틴 추가</button>
+      </div>
+      <div id="routineList" class="routine-list"></div>
+    </section>
     <section class="board-shell" aria-labelledby="boardTitle">
       <div class="board-heading">
         <div><div class="eyebrow">TODAY'S WORK BOARD</div><h2 id="boardTitle">오늘 업무 목록</h2></div>
@@ -262,12 +292,32 @@
       <button class="event-form-submit" type="submit">수정 내용 저장</button>
     </form>
   </dialog>
+  <dialog id="routineDialog">
+    <div class="event-dialog-head">
+      <h2>루틴 업무 추가</h2>
+      <button id="closeRoutineDialog" class="dialog-close" type="button" aria-label="루틴 추가 닫기">×</button>
+    </div>
+    <form id="routineForm" class="event-form">
+      <label>루틴 업무
+        <input id="routineText" type="text" maxlength="200" placeholder="예: 오전 메일 확인" required>
+      </label>
+      <label>체크 초기화 주기
+        <select id="routineRecurrence">
+          <option value="daily">매일 · 다음 날 초기화</option>
+          <option value="weekly">매주 · 다음 주 월요일 초기화</option>
+        </select>
+      </label>
+      <button class="event-form-submit" type="submit">루틴 추가</button>
+    </form>
+  </dialog>
   <div id="toast" class="toast" role="status"></div>
   <script>
     const grid = document.getElementById("calendarGrid");
     const board = document.getElementById("workBoard");
     const eventStripList = document.getElementById("eventStripList");
+    const routineList = document.getElementById("routineList");
     const editTaskDialog = document.getElementById("editTaskDialog");
+    const routineDialog = document.getElementById("routineDialog");
     const title = document.getElementById("monthTitle");
     const toast = document.getElementById("toast");
     const today = new Date();
@@ -276,6 +326,7 @@
     let tasks = [];
     let todayTasks = [];
     let nearbyEvents = [];
+    let checklistRoutines = [];
     let editingTask = null;
     const BOARD_STATUSES = [
       {key:"todo",label:"시작 전"},
@@ -487,6 +538,56 @@
         }
         columnHead.append(columnTitle,count);column.append(columnHead,list);board.append(column);
       });
+    }
+
+    function renderRoutines(){
+      routineList.replaceChildren();
+      if(!checklistRoutines.length){
+        const empty=document.createElement("div");empty.className="routine-empty";
+        empty.textContent="등록된 루틴이 없습니다. 루틴 추가 버튼으로 시작해보세요.";
+        routineList.append(empty);return;
+      }
+      checklistRoutines.forEach(routine=>{
+        const card=document.createElement("article");card.className=`routine-card${routine.completed?" completed":""}`;
+        const check=document.createElement("input");check.type="checkbox";check.className="routine-check";
+        check.checked=Boolean(routine.completed);check.setAttribute("aria-label",`${routine.text} 완료`);
+        check.addEventListener("change",async()=>{
+          check.disabled=true;
+          try{
+            await request("/api/calendar/routine",{
+              method:"POST",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({action:"toggle",id:routine.id,completed:check.checked})
+            });
+            await loadRoutines();
+          }catch(error){check.checked=!check.checked;check.disabled=false;showToast(error.message)}
+        });
+        const copy=document.createElement("div");copy.className="routine-copy";
+        const text=document.createElement("div");text.className="routine-text";text.textContent=routine.text;
+        const cycle=document.createElement("div");cycle.className="routine-cycle";
+        cycle.textContent=routine.recurrence==="weekly"?"매주 · 월요일 초기화":"매일 · 자정 이후 초기화";
+        copy.append(text,cycle);
+        const remove=document.createElement("button");remove.type="button";remove.className="routine-remove";
+        remove.textContent="×";remove.setAttribute("aria-label",`${routine.text} 삭제`);
+        remove.addEventListener("click",async()=>{
+          if(!confirm(`‘${routine.text}’ 루틴을 삭제할까요?`)) return;
+          remove.disabled=true;
+          try{
+            await request("/api/calendar/routine",{
+              method:"POST",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({action:"delete",id:routine.id})
+            });
+            await loadRoutines();showToast("루틴을 삭제했습니다.");
+          }catch(error){remove.disabled=false;showToast(error.message)}
+        });
+        card.append(check,copy,remove);routineList.append(card);
+      });
+    }
+
+    async function loadRoutines(){
+      try{
+        const data=await request("/api/calendar/routines");
+        checklistRoutines=data.routines||[];renderRoutines();
+      }catch(error){checklistRoutines=[];renderRoutines();showToast(error.message)}
     }
 
     function shortDate(value){
@@ -708,6 +809,29 @@
       }catch(error){tasks=[];todayTasks=[];nearbyEvents=[];render();showToast(error.message)}
     }
 
+    document.getElementById("addRoutine").addEventListener("click",()=>{
+      document.getElementById("routineText").value="";
+      document.getElementById("routineRecurrence").value="daily";
+      routineDialog.showModal();document.getElementById("routineText").focus();
+    });
+    document.getElementById("closeRoutineDialog").addEventListener("click",()=>routineDialog.close());
+    document.getElementById("routineForm").addEventListener("submit",async event=>{
+      event.preventDefault();
+      const submit=event.currentTarget.querySelector("button[type='submit']");
+      submit.disabled=true;
+      try{
+        await request("/api/calendar/routine",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            action:"add",
+            text:document.getElementById("routineText").value.trim(),
+            recurrence:document.getElementById("routineRecurrence").value
+          })
+        });
+        routineDialog.close();await loadRoutines();showToast("루틴을 추가했습니다.");
+      }catch(error){submit.disabled=false;showToast(error.message)}
+    });
+
     document.getElementById("prevMonth").addEventListener("click",()=>{
       viewDate=new Date(viewDate.getFullYear(),viewDate.getMonth()-1,1);loadMonth();
     });
@@ -765,7 +889,7 @@
         await loadMonth();showToast("일정을 수정했습니다.");
       }catch(error){submit.disabled=false;showToast(error.message)}
     });
-    loadMonth();
+    loadMonth();loadRoutines();
   </script>
 </body>
 </html>

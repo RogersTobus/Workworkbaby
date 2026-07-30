@@ -280,6 +280,7 @@ def update_sales_email_data(payload: dict) -> dict:
             name = str(payload.get("name", "")).strip()
             company = str(payload.get("company", "")).strip()
             platform = str(payload.get("platform", "")).strip()
+            group = str(payload.get("group", "")).strip()
             memo = str(payload.get("memo", "")).strip()
             if not name:
                 raise ValueError("담당자명을 입력해주세요.")
@@ -298,6 +299,7 @@ def update_sales_email_data(payload: dict) -> dict:
                     "email": email[:320],
                     "company": company[:150],
                     "platform": platform[:100],
+                    "group": group[:100],
                     "memo": memo[:3000],
                     "updated_at": now,
                 }
@@ -1284,6 +1286,127 @@ def routine_occurs_on(item: dict, target: date) -> bool:
     return False
 
 
+def checklist_routine_period_key(item: dict, target: date) -> str:
+    recurrence = str(item.get("recurrence", "daily"))
+    if recurrence == "weekly":
+        return (target - timedelta(days=target.weekday())).isoformat()
+    return target.isoformat()
+
+
+def get_calendar_checklist_routines() -> dict:
+    target = date.today()
+    with CALENDAR_LOCK:
+        stored = load_calendar_tasks()
+    routines = []
+    for item in stored:
+        if item.get("kind") != "checklist_routine":
+            continue
+        recurrence = str(item.get("recurrence", "daily"))
+        if recurrence not in {"daily", "weekly"}:
+            recurrence = "daily"
+        period_key = checklist_routine_period_key(item, target)
+        completed_at = dict(item.get("completions") or {}).get(period_key)
+        routines.append(
+            {
+                "id": str(item.get("id", "")),
+                "text": str(item.get("text", "")),
+                "recurrence": recurrence,
+                "recurrence_label": "매주" if recurrence == "weekly" else "매일",
+                "period_key": period_key,
+                "completed": bool(completed_at),
+                "completed_at": completed_at,
+                "created_at": str(item.get("created_at", "")),
+            }
+        )
+    routines.sort(
+        key=lambda item: (
+            bool(item.get("completed")),
+            str(item.get("created_at", "")),
+        )
+    )
+    return {"date": target.isoformat(), "routines": routines}
+
+
+def update_calendar_checklist_routine(payload: dict) -> dict:
+    action = str(payload.get("action", "")).strip()
+    now = datetime.now().isoformat(timespec="seconds")
+    target = date.today()
+    with CALENDAR_LOCK:
+        tasks = load_calendar_tasks()
+        if action == "add":
+            text = str(payload.get("text", "")).strip()
+            recurrence = str(payload.get("recurrence", "daily")).strip()
+            if not text:
+                raise ValueError("루틴 업무를 입력해주세요.")
+            if len(text) > 200:
+                raise ValueError("루틴 업무는 200자까지 입력할 수 있습니다.")
+            if recurrence not in {"daily", "weekly"}:
+                raise ValueError("루틴 반복 주기는 매일 또는 매주만 선택할 수 있습니다.")
+            routine = {
+                "id": uuid4().hex,
+                "kind": "checklist_routine",
+                "text": text,
+                "recurrence": recurrence,
+                "completions": {},
+                "created_at": now,
+                "updated_at": now,
+            }
+            tasks.append(routine)
+            result = dict(routine)
+            result.update(
+                {
+                    "recurrence_label": "매주" if recurrence == "weekly" else "매일",
+                    "period_key": checklist_routine_period_key(routine, target),
+                    "completed": False,
+                    "completed_at": None,
+                }
+            )
+        elif action == "toggle":
+            routine_id = str(payload.get("id", "")).strip()
+            routine = next(
+                (
+                    item
+                    for item in tasks
+                    if item.get("id") == routine_id
+                    and item.get("kind") == "checklist_routine"
+                ),
+                None,
+            )
+            if routine is None:
+                raise ValueError("루틴 업무를 찾을 수 없습니다.")
+            period_key = checklist_routine_period_key(routine, target)
+            completions = dict(routine.get("completions") or {})
+            if bool(payload.get("completed", False)):
+                completions[period_key] = now
+            else:
+                completions.pop(period_key, None)
+            routine["completions"] = completions
+            routine["updated_at"] = now
+            result = {
+                **routine,
+                "recurrence_label": (
+                    "매주" if routine.get("recurrence") == "weekly" else "매일"
+                ),
+                "period_key": period_key,
+                "completed": period_key in completions,
+                "completed_at": completions.get(period_key),
+            }
+        elif action == "delete":
+            routine_id = str(payload.get("id", "")).strip()
+            if not any(
+                item.get("id") == routine_id
+                and item.get("kind") == "checklist_routine"
+                for item in tasks
+            ):
+                raise ValueError("삭제할 루틴 업무를 찾을 수 없습니다.")
+            tasks = [item for item in tasks if item.get("id") != routine_id]
+            result = {"id": routine_id}
+        else:
+            raise ValueError("지원하지 않는 루틴 작업입니다.")
+        save_calendar_tasks(tasks)
+    return {"ok": True, "routine": result}
+
+
 def routine_occurrence(item: dict, target: date) -> dict:
     task_date = target.isoformat()
     completed_at = dict(item.get("completions") or {}).get(task_date)
@@ -1441,6 +1564,8 @@ def get_calendar_month(month: str) -> dict:
         stored = load_calendar_tasks()
     tasks: list[dict] = []
     for item in stored:
+        if item.get("kind") == "checklist_routine":
+            continue
         if item.get("kind") in {"routine", "event"}:
             target = month_start
             target_end = next_month
@@ -1473,6 +1598,8 @@ def get_calendar_today() -> dict:
     with CALENDAR_LOCK:
         stored = load_calendar_tasks()
         for item in stored:
+            if item.get("kind") == "checklist_routine":
+                continue
             if item.get("kind") == "routine":
                 _, routine_changed = prepare_routine_today(item, target)
                 changed = changed or routine_changed
@@ -1497,6 +1624,8 @@ def get_calendar_today() -> dict:
     nearby_start = target - timedelta(days=1)
     nearby_end = target + timedelta(days=2)
     for item in stored:
+        if item.get("kind") == "checklist_routine":
+            continue
         if item.get("kind") == "event":
             try:
                 event_start = date.fromisoformat(str(item.get("date", "")))
@@ -3254,6 +3383,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json(get_calendar_month(month))
             elif path == "/api/calendar/today":
                 self.send_json(get_calendar_today())
+            elif path == "/api/calendar/routines":
+                self.send_json(get_calendar_checklist_routines())
             elif path == "/api/calendar/sync/status":
                 self.send_json(dict(CALENDAR_SYNC_STATUS))
             elif path == "/api/meetings":
@@ -3459,6 +3590,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_file(output_path, filename)
             elif path == "/api/calendar/task":
                 self.send_json(update_calendar_task(payload))
+            elif path == "/api/calendar/routine":
+                self.send_json(update_calendar_checklist_routine(payload))
             elif path == "/api/calendar/sync":
                 self.send_json(sync_calendar_events())
             elif path == "/api/meetings":

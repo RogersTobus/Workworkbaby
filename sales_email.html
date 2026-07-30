@@ -30,6 +30,8 @@
     .list{max-height:590px;overflow:auto;padding:8px}
     .contact,.history-item{padding:12px;border:1px solid transparent;border-radius:14px;margin-bottom:6px;cursor:pointer}
     .contact:hover,.contact.active{background:var(--blue);border-color:#cfddf2}.contact strong{display:block;font-size:14px}.sub{font-size:12px;color:var(--muted);margin-top:3px}
+    .contact-tools{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:14px 16px 8px}.contact-tools .search{margin:0;width:100%}
+    .group-chip{display:inline-flex;margin-top:6px;border-radius:999px;background:#e8eefb;color:#48649a;padding:2px 7px;font-size:10px;font-weight:800}
     .composer-head{padding:18px 20px;background:linear-gradient(90deg,var(--mint),#fff)}
     .selected{font-size:16px;font-weight:800}.selected small{display:block;font-size:12px;color:var(--muted);font-weight:500;margin-top:2px}
     .templatebar{display:grid;grid-template-columns:1fr auto auto;gap:8px}
@@ -43,6 +45,9 @@
     .signature img{width:88px;height:auto;object-fit:contain;align-self:end}.signature-copy{font-size:12px;line-height:1.6;color:#111}.signature-copy strong{font-size:13px;color:#111}.signature-copy b{display:inline-block;width:15px;color:#111}.signature-copy a{color:#0645d8}.locked{align-self:start;background:#edf2f7;color:#758196;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:800}
     .fixed-cc{display:grid;gap:10px;border:1px solid #d9e4ef;background:#f4f8fc;border-radius:13px;padding:11px 13px}.fixed-cc-row{display:flex;gap:8px;align-items:flex-start}.fixed-cc b{flex:0 0 auto;color:#315171}.cc-list{display:flex;gap:6px;flex-wrap:wrap}.cc-chip{background:#e3edf8;color:#315171;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700}.extra-cc{grid-template-columns:110px 1fr;align-items:center}.extra-cc input{background:#fff}.extra-cc small{grid-column:2;color:#8290a4;font-weight:500}
     .history{max-height:420px;overflow:auto;padding:8px}.history-item{background:#fafbfd;border-color:#edf0f3;cursor:default}.history-item strong{display:block}.date{font-size:11px;color:#8994a6}
+    .group-send{display:grid;grid-template-columns:minmax(160px,1fr) auto auto;gap:8px;align-items:center;border:1px solid #d7e2f2;border-radius:14px;background:#f7f9fe;padding:11px}
+    .group-progress{grid-column:1/-1;display:none;color:#586984;font-size:12px;font-weight:750}
+    .group-progress.show{display:block}
     .empty{padding:34px 18px;text-align:center;color:#96a0b0}.modal{position:fixed;inset:0;background:rgba(16,25,40,.42);display:none;place-items:center;padding:24px;z-index:10}
     .modal.show{display:grid}.modal-box{width:min(520px,100%);background:#fff;border-radius:20px;padding:22px;box-shadow:0 30px 90px rgba(0,0,0,.25)}
     .modal-title{font-size:20px;font-weight:900;margin-bottom:14px}.toast{position:fixed;right:24px;bottom:24px;background:#172239;color:#fff;padding:12px 16px;border-radius:12px;opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none}.toast.show{opacity:1;transform:none}
@@ -67,7 +72,10 @@
     <aside class="left stack">
       <section class="card">
         <div class="card-head"><h2>연락처</h2><button class="btn primary" id="newContact">+ 추가</button></div>
-        <input class="search" id="contactSearch" placeholder="이름·회사·이메일 검색">
+        <div class="contact-tools">
+          <input class="search" id="contactSearch" placeholder="이름·회사·이메일 검색">
+          <select id="contactGroupFilter" aria-label="연락처 그룹 필터"><option value="">전체 그룹</option></select>
+        </div>
         <div class="list" id="contactList"></div>
       </section>
       <section class="card contact-editor">
@@ -76,6 +84,8 @@
           <input type="hidden" id="contactId">
           <div class="row contact-fields"><label>담당자명<input id="contactName"></label><label>회사명<input id="contactCompany"></label></div>
           <label>이메일<input id="contactEmail" type="email"></label>
+          <label>그룹<input id="contactGroup" list="contactGroupOptions" placeholder="예: 베네피아 담당자"></label>
+          <datalist id="contactGroupOptions"></datalist>
           <label>메모<textarea id="contactMemo" placeholder="관계, 제안 이력, 주의사항"></textarea></label>
           <div class="row"><button class="btn primary" id="saveContact">연락처 저장</button><button class="btn danger" id="deleteContact">삭제</button></div>
         </div>
@@ -95,6 +105,12 @@
           <select id="templateSelect"><option value="">메일 양식 선택</option></select>
           <button class="btn" id="saveTemplate">양식 저장</button>
           <button class="btn" id="deleteTemplate">양식 삭제</button>
+        </div>
+        <div class="group-send">
+          <select id="groupSendSelect" aria-label="개별 발송할 연락처 그룹"><option value="">개별 발송할 그룹 선택</option></select>
+          <button class="btn dark" id="startGroupSend" type="button">그룹 개별 발송</button>
+          <button class="btn" id="nextGroupSend" type="button" disabled>다음 사람 초안</button>
+          <div class="group-progress" id="groupSendProgress"></div>
         </div>
         <div class="fixed-cc">
           <div class="fixed-cc-row">
@@ -155,7 +171,7 @@
 
 <script>
   const $=s=>document.querySelector(s);
-  let store={contacts:[],templates:[],drafts:{},history:[]}, selectedId="", attachments=[];
+  let store={contacts:[],templates:[],drafts:{},history:[]}, selectedId="", attachments=[], groupQueue=null;
   const signatureText=`Young jun Park | 박영준
 Assistant Manager | 글로벌 e-Biz 매니저
 
@@ -176,9 +192,21 @@ A #1101, GIFC Tower, 240 Kintex-ro, Goyang-si, Republic of Korea`;
   const currentContact=()=>store.contacts.find(x=>x.id===selectedId);
   function renderContacts(){
     const q=$("#contactSearch").value.trim().toLowerCase();
-    const rows=store.contacts.filter(c=>[c.name,c.company,c.email].join(" ").toLowerCase().includes(q));
-    $("#contactList").innerHTML=rows.length?rows.map(c=>`<div class="contact ${c.id===selectedId?"active":""}" data-id="${c.id}"><strong>${esc(c.name)}${c.company?` · ${esc(c.company)}`:""}</strong><div class="sub">${esc(c.email)}</div></div>`).join(""):`<div class="empty">연락처를 추가해주세요.</div>`;
+    const group=$("#contactGroupFilter").value;
+    const rows=store.contacts.filter(c=>(!group||c.group===group)&&[c.name,c.company,c.email,c.group].join(" ").toLowerCase().includes(q));
+    $("#contactList").innerHTML=rows.length?rows.map(c=>`<div class="contact ${c.id===selectedId?"active":""}" data-id="${c.id}"><strong>${esc(c.name)}${c.company?` · ${esc(c.company)}`:""}</strong><div class="sub">${esc(c.email)}</div>${c.group?`<span class="group-chip">${esc(c.group)}</span>`:""}</div>`).join(""):`<div class="empty">조건에 맞는 연락처가 없습니다.</div>`;
     $("#contactList").querySelectorAll(".contact").forEach(el=>el.onclick=()=>selectContact(el.dataset.id));
+  }
+  function contactGroups(){
+    return [...new Set(store.contacts.map(c=>String(c.group||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ko"));
+  }
+  function renderGroups(){
+    const groups=contactGroups(),filterValue=$("#contactGroupFilter").value,sendValue=$("#groupSendSelect").value;
+    $("#contactGroupFilter").innerHTML=`<option value="">전체 그룹</option>`+groups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("");
+    $("#groupSendSelect").innerHTML=`<option value="">개별 발송할 그룹 선택</option>`+groups.map(g=>`<option value="${esc(g)}">${esc(g)} · ${store.contacts.filter(c=>c.group===g).length}명</option>`).join("");
+    $("#contactGroupOptions").innerHTML=groups.map(g=>`<option value="${esc(g)}"></option>`).join("");
+    if(groups.includes(filterValue))$("#contactGroupFilter").value=filterValue;
+    if(groups.includes(sendValue))$("#groupSendSelect").value=sendValue;
   }
   function renderTemplates(){
     const value=$("#templateSelect").value;
@@ -196,7 +224,7 @@ A #1101, GIFC Tower, 240 Kintex-ro, Goyang-si, Republic of Korea`;
   }
   function fillContact(c={}){
     $("#contactId").value=c.id||"";$("#contactName").value=c.name||"";$("#contactCompany").value=c.company||"";
-    $("#contactEmail").value=c.email||"";$("#contactMemo").value=c.memo||"";
+    $("#contactEmail").value=c.email||"";$("#contactGroup").value=c.group||"";$("#contactMemo").value=c.memo||"";
   }
   function selectContact(id){
     selectedId=id;const c=currentContact();if(!c)return;
@@ -213,14 +241,15 @@ A #1101, GIFC Tower, 240 Kintex-ro, Goyang-si, Republic of Korea`;
     store.drafts[c.id]=result.draft;if(!silent)toast("임시 저장했습니다.");
   }
   async function load(){
-    const r=await fetch("/api/sales-email");store=await r.json();renderContacts();renderTemplates();renderHistory();
+    const r=await fetch("/api/sales-email");store=await r.json();renderGroups();renderContacts();renderTemplates();renderHistory();
     $("#status").textContent=`연락처 ${store.contacts.length}명 · 양식 ${store.templates.length}개`;
     if(store.contacts.length)selectContact(store.contacts[0].id);
   }
   $("#contactSearch").oninput=renderContacts;
+  $("#contactGroupFilter").onchange=renderContacts;
   $("#newContact").onclick=()=>{selectedId="";fillContact();$("#extraCc").value="";$("#selectedContact").innerHTML=`새 연락처<small>정보를 입력하고 저장해주세요.</small>`;renderContacts();renderHistory()};
-  $("#saveContact").onclick=async()=>{try{const existing=currentContact();const r=await api({action:"save_contact",id:$("#contactId").value,name:$("#contactName").value,company:$("#contactCompany").value,email:$("#contactEmail").value,platform:existing?.platform||"",memo:$("#contactMemo").value});const i=store.contacts.findIndex(x=>x.id===r.contact.id);if(i>=0)store.contacts[i]=r.contact;else store.contacts.push(r.contact);selectContact(r.contact.id);toast("연락처를 저장했습니다.")}catch(e){toast(e.message)}};
-  $("#deleteContact").onclick=async()=>{if(!selectedId||!confirm("이 연락처를 삭제할까요?"))return;try{await api({action:"delete_contact",id:selectedId});store.contacts=store.contacts.filter(x=>x.id!==selectedId);delete store.drafts[selectedId];selectedId="";fillContact();renderContacts();renderHistory();toast("삭제했습니다.")}catch(e){toast(e.message)}};
+  $("#saveContact").onclick=async()=>{try{const existing=currentContact();const r=await api({action:"save_contact",id:$("#contactId").value,name:$("#contactName").value,company:$("#contactCompany").value,email:$("#contactEmail").value,group:$("#contactGroup").value,platform:existing?.platform||"",memo:$("#contactMemo").value});const i=store.contacts.findIndex(x=>x.id===r.contact.id);if(i>=0)store.contacts[i]=r.contact;else store.contacts.push(r.contact);renderGroups();selectContact(r.contact.id);toast("연락처와 그룹을 저장했습니다.")}catch(e){toast(e.message)}};
+  $("#deleteContact").onclick=async()=>{if(!selectedId||!confirm("이 연락처를 삭제할까요?"))return;try{await api({action:"delete_contact",id:selectedId});store.contacts=store.contacts.filter(x=>x.id!==selectedId);delete store.drafts[selectedId];selectedId="";fillContact();renderGroups();renderContacts();renderHistory();toast("삭제했습니다.")}catch(e){toast(e.message)}};
   $("#templateSelect").onchange=()=>{const t=store.templates.find(x=>x.id===$("#templateSelect").value),c=currentContact();if(t&&c){$("#subject").value=merge(t.subject,c);$("#body").value=merge(t.body,c);$("#extraCc").value=(t.extra_cc||[]).join(", ")}};
   $("#saveTemplate").onclick=()=>{$("#templateName").value=store.templates.find(x=>x.id===$("#templateSelect").value)?.name||"";$("#templateModal").classList.add("show")};
   $("#cancelTemplate").onclick=()=>$("#templateModal").classList.remove("show");
@@ -229,6 +258,37 @@ A #1101, GIFC Tower, 240 Kintex-ro, Goyang-si, Republic of Korea`;
   $("#saveDraft").onclick=()=>saveDraft().catch(e=>toast(e.message));
   const dz=$("#dropZone"),fi=$("#fileInput");dz.onclick=()=>fi.click();["dragenter","dragover"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.add("drag")}));["dragleave","drop"].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.remove("drag")}));dz.ondrop=e=>uploadFiles(e.dataTransfer.files);fi.onchange=()=>uploadFiles(fi.files);
   async function uploadFiles(files){for(const file of files){try{const r=await fetch(`/api/sales-email/attachments?filename=${encodeURIComponent(file.name)}`,{method:"POST",headers:{"Content-Type":file.type||"application/octet-stream"},body:file});const j=await r.json();if(!r.ok)throw Error(j.error||"첨부 실패");attachments.push(j.attachment);renderFiles()}catch(e){toast(e.message)}}fi.value=""}
+  const bodyWithSignature=text=>`${String(text||"").trim()}\n\n${signatureText}`.trim();
+  const htmlWithSignature=text=>`<div style="font-family:Arial,'Malgun Gothic',sans-serif;font-size:14px;line-height:1.65">${htmlEscape(text).replace(/\n/g,"<br>")}</div><br><br>${signatureHtml}`;
+  async function openGroupDraft(){
+    if(!groupQueue||groupQueue.index>=groupQueue.contacts.length){toast("그룹 개별 발송이 모두 준비됐습니다.");return}
+    const c=groupQueue.contacts[groupQueue.index],subject=merge(groupQueue.subject,c),body=merge(groupQueue.body,c);
+    $("#startGroupSend").disabled=true;$("#nextGroupSend").disabled=true;
+    try{
+      const draft=await api({action:"save_draft",contact_id:c.id,template_id:groupQueue.templateId,subject,body,extra_cc:groupQueue.extraCc,attachments:groupQueue.attachments});
+      store.drafts[c.id]=draft.draft;
+      const r=await fetch("/api/sales-email/outlook-draft",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contact_id:c.id,cc:groupQueue.cc,subject,full_body:bodyWithSignature(body),full_html:htmlWithSignature(body),attachments:groupQueue.attachments})});
+      const j=await r.json();if(!r.ok)throw Error(j.error||"Outlook 작성 팝업을 열지 못했습니다.");
+      groupQueue.index+=1;
+      const done=groupQueue.index>=groupQueue.contacts.length;
+      $("#groupSendProgress").textContent=`${groupQueue.group} · ${c.name} 초안 준비 완료 · ${groupQueue.index}/${groupQueue.contacts.length}명`;
+      $("#groupSendProgress").classList.add("show");
+      $("#nextGroupSend").disabled=done;
+      $("#nextGroupSend").textContent=done?"모두 준비됨":"다음 사람 초안";
+      toast(`${c.name}님의 개별 Outlook 초안을 열었습니다.`);
+    }catch(e){$("#nextGroupSend").disabled=false;toast(e.message)}
+    finally{$("#startGroupSend").disabled=false}
+  }
+  $("#startGroupSend").onclick=async()=>{
+    const group=$("#groupSendSelect").value,t=store.templates.find(x=>x.id===$("#templateSelect").value);
+    if(!group){toast("개별 발송할 그룹을 선택해주세요.");return}
+    if(!t){toast("그룹에 적용할 메일 양식을 선택해주세요.");return}
+    const contacts=store.contacts.filter(c=>c.group===group);
+    if(!contacts.length){toast("선택한 그룹에 연락처가 없습니다.");return}
+    groupQueue={group,contacts,index:0,templateId:t.id,subject:t.subject,body:t.body,extraCc:[...(t.extra_cc||[])],cc:[...new Map([...fixedCc,...(t.extra_cc||[])].map(v=>[v.toLowerCase(),v])).values()],attachments:[...attachments]};
+    $("#nextGroupSend").textContent="다음 사람 초안";await openGroupDraft();
+  };
+  $("#nextGroupSend").onclick=openGroupDraft;
   $("#openOutlook").onclick=async()=>{try{const c=currentContact();if(!c)throw Error("연락처를 먼저 선택해주세요.");await saveDraft(true);const r=await fetch("/api/sales-email/outlook-draft",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contact_id:c.id,cc:allCc(),subject:$("#subject").value,full_body:fullMailBody(),full_html:fullMailHtml(),attachments})});const j=await r.json();if(!r.ok)throw Error(j.error||"Outlook 작성 팝업을 열지 못했습니다.");toast(j.message)}catch(e){toast(e.message)}};
   $("#recordSent").onclick=async()=>{try{const c=currentContact();if(!c)throw Error("연락처를 먼저 선택해주세요.");if(!confirm(`${c.name}님에게 보낸 메일로 기록할까요?`))return;const r=await api({action:"record_sent",contact_id:c.id,cc:allCc(),extra_cc:extraCc(),template_id:$("#templateSelect").value,subject:$("#subject").value,body:$("#body").value,full_body:fullMailBody(),full_html:fullMailHtml(),attachments});store.history.unshift(r.record);store.drafts[c.id]={contact_id:c.id,template_id:r.record.template_id,subject:r.record.subject,body:r.record.body,extra_cc:r.record.extra_cc||[],attachments:r.record.attachments,updated_at:r.record.sent_at,last_sent_at:r.record.sent_at};renderHistory();toast("참조와 HTML 서명을 포함한 발송 이력을 기록했습니다.")}catch(e){toast(e.message)}};
   load().catch(e=>toast(e.message));
