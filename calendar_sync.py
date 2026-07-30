@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
 
@@ -47,6 +48,107 @@ def _parse_date(value: str) -> date:
     return datetime.strptime(value, "%y.%m.%d").date()
 
 
+def _ranges_overlap(left: dict, right: dict) -> bool:
+    return left["date"] <= right["end_date"] and right["date"] <= left["end_date"]
+
+
+def _parse_sheet_values(rows: list[list]) -> list[dict]:
+    candidates: list[dict] = []
+    exact_counts: Counter[tuple[str, str, str]] = Counter()
+    for row in rows:
+        for cell in row:
+            if not isinstance(cell, str):
+                continue
+            match = DATE_PATTERN.search(cell)
+            if match is None:
+                continue
+            event_name = cell[: match.start()].strip(" _")
+            if not event_name:
+                continue
+            start = _parse_date(match.group("start"))
+            end = _parse_date(match.group("end") or match.group("start"))
+            if end < start:
+                continue
+            exact_key = (
+                event_name.casefold(),
+                start.isoformat(),
+                end.isoformat(),
+            )
+            exact_counts[exact_key] += 1
+            candidates.append(
+                {
+                    "name_key": event_name.casefold(),
+                    "date": start.isoformat(),
+                    "end_date": end.isoformat(),
+                    "text": event_name,
+                    "exact_key": exact_key,
+                    "order": len(candidates),
+                }
+            )
+
+    unique_candidates: list[dict] = []
+    seen_exact: set[tuple[str, str, str]] = set()
+    for candidate in candidates:
+        exact_key = candidate["exact_key"]
+        if exact_key in seen_exact:
+            continue
+        seen_exact.add(exact_key)
+        candidate["occurrences"] = exact_counts[exact_key]
+        unique_candidates.append(candidate)
+
+    selected: list[dict] = []
+    by_name: dict[str, list[dict]] = {}
+    for candidate in unique_candidates:
+        by_name.setdefault(candidate["name_key"], []).append(candidate)
+
+    for same_name in by_name.values():
+        remaining = list(same_name)
+        while remaining:
+            component = [remaining.pop(0)]
+            changed = True
+            while changed:
+                changed = False
+                for candidate in list(remaining):
+                    if any(_ranges_overlap(candidate, item) for item in component):
+                        component.append(candidate)
+                        remaining.remove(candidate)
+                        changed = True
+            selected.append(
+                max(
+                    component,
+                    key=lambda item: (item["occurrences"], -item["order"]),
+                )
+            )
+
+    parsed_events: list[dict] = []
+    for candidate in selected:
+        event_name = candidate["text"]
+        source_text = (
+            f"{event_name}|{candidate['date']}|{candidate['end_date']}"
+        )
+        source_key = hashlib.sha1(source_text.encode("utf-8")).hexdigest()
+        if "팝업" in event_name:
+            event_type = "popup"
+        elif "공구" in event_name or "공동구매" in event_name:
+            event_type = "group_buy"
+        else:
+            event_type = "special"
+        parsed_events.append(
+            {
+                "source_key": source_key,
+                "date": candidate["date"],
+                "end_date": candidate["end_date"],
+                "text": event_name,
+                "event_type": event_type,
+            }
+        )
+
+    parsed_events.sort(
+        key=lambda item: (item["date"], item["end_date"], item["text"])
+    )
+    return parsed_events
+
+
 def fetch_sheet_events(app_dir: Path, config: dict) -> list[dict]:
     service = _google_service(app_dir, config)
     spreadsheet_id = str(config["spreadsheet_id"])
@@ -62,55 +164,7 @@ def fetch_sheet_events(app_dir: Path, config: dict) -> list[dict]:
         )
         .execute()
     )
-    parsed_events: list[dict] = []
-    seen: set[tuple[str, str, str]] = set()
-    for row in response.get("values", []):
-        for cell in row:
-            if not isinstance(cell, str):
-                continue
-            match = DATE_PATTERN.search(cell)
-            if match is None:
-                continue
-            event_name = cell[: match.start()].strip(" _")
-            if not event_name:
-                continue
-            start = _parse_date(match.group("start"))
-            end = _parse_date(match.group("end") or match.group("start"))
-            if end < start:
-                continue
-            dedupe_key = (
-                event_name.casefold(),
-                start.isoformat(),
-                end.isoformat(),
-            )
-            if dedupe_key in seen:
-                continue
-            seen.add(dedupe_key)
-            source_text = (
-                f"{event_name}|{start.isoformat()}|{end.isoformat()}"
-            )
-            source_key = hashlib.sha1(
-                source_text.encode("utf-8")
-            ).hexdigest()
-            if "팝업" in event_name:
-                event_type = "popup"
-            elif "공구" in event_name or "공동구매" in event_name:
-                event_type = "group_buy"
-            else:
-                event_type = "special"
-            parsed_events.append(
-                {
-                    "source_key": source_key,
-                    "date": start.isoformat(),
-                    "end_date": end.isoformat(),
-                    "text": event_name,
-                    "event_type": event_type,
-                }
-            )
-    parsed_events.sort(
-        key=lambda item: (item["date"], item["end_date"], item["text"])
-    )
-    return parsed_events
+    return _parse_sheet_values(response.get("values", []))
 
 
 def merge_sheet_events(
