@@ -39,6 +39,7 @@ from brand_connect_sheet import (
     row_has_proposal_status,
     set_proposal_date_if_blank,
 )
+from dm_templates import DM_MESSAGE_TEMPLATES
 from price_updater import PriceUpdateManager
 from simulation_manager import SimulationManager
 
@@ -98,6 +99,10 @@ MAX_RECORDING_BYTES = 1024 * 1024 * 1024
 def load_config() -> dict:
     with CONFIG_PATH.open("r", encoding="utf-8") as file:
         config = json.load(file)
+    for brand_key, message_template in DM_MESSAGE_TEMPLATES.items():
+        brand = config.get("brands", {}).get(brand_key)
+        if isinstance(brand, dict):
+            brand["message_template"] = message_template
     workbook_path = Path(config["workbook_path"])
     if not workbook_path.is_absolute():
         workbook_path = APP_DIR / workbook_path
