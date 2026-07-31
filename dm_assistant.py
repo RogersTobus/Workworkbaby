@@ -40,6 +40,7 @@ from brand_connect_sheet import (
     PROPOSAL_STATUS_VALUES,
     find_favorite_date_column,
     is_favorite_candidate,
+    is_legacy_favorite_value,
 )
 from dm_templates import DM_MESSAGE_TEMPLATES
 from instagram_dm_sender import InstagramDMSenderManager
@@ -61,6 +62,9 @@ THEME_CSS_PATH = APP_DIR / "theme_meeting.css"
 GLASS_THEME_CSS_PATH = APP_DIR / "glass_theme.css"
 BRAND_CONNECT_CAMPAIGNS_PATH = (
     APP_DIR / "app_data" / "brand_connect_campaigns.json"
+)
+BRAND_CONNECT_FAVORITES_PATH = (
+    APP_DIR / "app_data" / "brand_connect_favorites.json"
 )
 BRAND_CONNECTING_SHEETS = {
     "alp": {
@@ -121,6 +125,7 @@ SIMULATION_MANAGER = SimulationManager(
     APP_DIR, CONFIG["simulation"], PRICE_MANAGER
 )
 LOCK = threading.Lock()
+BRAND_CONNECT_FAVORITES_LOCK = threading.Lock()
 DM_SYNC_LOCK = threading.Lock()
 DM_TEMPLATE_LOCK = threading.Lock()
 CALENDAR_LOCK = threading.Lock()
@@ -2790,6 +2795,155 @@ def save_brand_connect_results(
     }
 
 
+def brand_connect_favorite_key(
+    brand_key: str,
+    platform: str,
+    product: str,
+    creator: object,
+) -> str:
+    return "|".join(
+        (
+            brand_key,
+            platform,
+            product,
+            normalize_creator(creator),
+        )
+    )
+
+
+def load_brand_connect_favorite_ledger() -> dict[str, dict]:
+    with BRAND_CONNECT_FAVORITES_LOCK:
+        try:
+            stored = json.loads(
+                BRAND_CONNECT_FAVORITES_PATH.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            return {}
+    return stored if isinstance(stored, dict) else {}
+
+
+def record_brand_connect_favorites(
+    brand_key: str,
+    product: str,
+    completed: list[dict],
+) -> int:
+    if not completed:
+        return 0
+    with BRAND_CONNECT_FAVORITES_LOCK:
+        try:
+            stored = json.loads(
+                BRAND_CONNECT_FAVORITES_PATH.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            stored = {}
+        if not isinstance(stored, dict):
+            stored = {}
+        recorded = 0
+        for item in completed:
+            creator = str(item.get("creator", "")).strip()
+            platform = str(item.get("platform", "")).strip()
+            if not creator or platform not in FAVORITE_PLATFORM_LABELS:
+                continue
+            key = brand_connect_favorite_key(
+                brand_key,
+                platform,
+                product,
+                creator,
+            )
+            if key not in stored:
+                recorded += 1
+            stored[key] = {
+                "brand": brand_key,
+                "platform": platform,
+                "product": product,
+                "creator": creator,
+                "completed_at": datetime.now().isoformat(timespec="seconds"),
+            }
+        BRAND_CONNECT_FAVORITES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temporary = BRAND_CONNECT_FAVORITES_PATH.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(stored, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temporary.replace(BRAND_CONNECT_FAVORITES_PATH)
+    return recorded
+
+
+def cleanup_brand_connect_favorite_marks(
+    brand_key: str,
+    *,
+    upload: bool,
+) -> dict:
+    source = BRAND_CONNECTING_SHEETS.get(brand_key)
+    if source is None:
+        raise ValueError("지원하지 않는 브랜드입니다.")
+    reverse_platforms = {
+        label: platform for platform, label in FAVORITE_PLATFORM_LABELS.items()
+    }
+    migrated: list[dict] = []
+    cleared = 0
+    with LOCK:
+        workbook = load_workbook(
+            CONFIG["_workbook_path"],
+            data_only=False,
+            keep_links=True,
+        )
+        try:
+            sheet = workbook[source["sheet_name"]]
+            headers = {
+                str(sheet.cell(1, column).value or "").strip(): column
+                for column in range(1, sheet.max_column + 1)
+                if str(sheet.cell(1, column).value or "").strip()
+            }
+            creator_column = headers.get("크리에이터")
+            platform_column = headers.get("플랫폼")
+            if not creator_column or not platform_column:
+                return {"cleared": 0, "recorded": 0}
+            for product, product_label in FAVORITE_PRODUCT_LABELS[brand_key].items():
+                product_column = headers.get(product_label)
+                if not product_column:
+                    continue
+                for row in range(2, sheet.max_row + 1):
+                    cell = sheet.cell(row, product_column)
+                    if not is_legacy_favorite_value(cell.value):
+                        continue
+                    creator = str(
+                        sheet.cell(row, creator_column).value or ""
+                    ).strip()
+                    platform_label = str(
+                        sheet.cell(row, platform_column).value or ""
+                    ).strip()
+                    platform = reverse_platforms.get(platform_label, "")
+                    if creator and platform:
+                        migrated.append(
+                            {
+                                "creator": creator,
+                                "platform": platform,
+                                "product": product,
+                            }
+                        )
+                    cell.value = None
+                    cleared += 1
+            if cleared:
+                ensure_backup()
+                save_atomic(workbook)
+        finally:
+            workbook.close()
+    recorded = 0
+    for product in FAVORITE_PRODUCT_LABELS[brand_key]:
+        recorded += record_brand_connect_favorites(
+            brand_key,
+            product,
+            [item for item in migrated if item["product"] == product],
+        )
+    drive = (
+        upload_dm_workbook_to_drive()
+        if upload and cleared
+        else {"status": "skipped", "message": "정리할 기존 찜 표시가 없습니다."}
+    )
+    return {"cleared": cleared, "recorded": recorded, "drive": drive}
+
+
 def prepare_brand_connect_favorites(
     brand_key: str,
     platform: str,
@@ -2802,6 +2956,8 @@ def prepare_brand_connect_favorites(
     if source is None or not product_label or not platform_label:
         raise ValueError("올바른 브랜드·채널·상품을 선택해주세요.")
     sync_dm_workbook(force=True)
+    cleanup_brand_connect_favorite_marks(brand_key, upload=True)
+    favorite_ledger = load_brand_connect_favorite_ledger()
     with LOCK:
         workbook = load_workbook(
             CONFIG["_workbook_path"],
@@ -2850,9 +3006,17 @@ def prepare_brand_connect_favorites(
                     not creator
                     or row_platform != platform_label
                     or not is_favorite_candidate(proposal_date, selected)
+                    or brand_connect_favorite_key(
+                        brand_key,
+                        platform,
+                        product,
+                        creator,
+                    ) in favorite_ledger
                 ):
                     continue
-                candidates.append({"row": row, "creator": creator})
+                candidates.append(
+                    {"row": row, "creator": creator, "platform": platform}
+                )
                 if len(candidates) >= count:
                     break
             return candidates
@@ -2869,71 +3033,18 @@ def save_brand_connect_favorites(
     product_label = FAVORITE_PRODUCT_LABELS.get(brand_key, {}).get(product)
     if source is None or not product_label:
         raise ValueError("올바른 브랜드·상품을 선택해주세요.")
-    marked = 0
-    dated = 0
-    date_preserved = 0
-    skipped = 0
-    favorite_date = date.today().strftime("%Y.%m.%d")
-    with LOCK:
-        workbook = load_workbook(
-            CONFIG["_workbook_path"],
-            data_only=False,
-            keep_links=True,
-        )
-        try:
-            sheet = workbook[source["sheet_name"]]
-            headers = {}
-            for column in range(1, sheet.max_column + 1):
-                header = str(sheet.cell(1, column).value or "").strip()
-                if header:
-                    headers.setdefault(header, column)
-            creator_column = headers.get("크리에이터")
-            date_column = find_favorite_date_column(
-                headers,
-                brand_key,
-                product,
-            )
-            product_column = headers.get(product_label)
-            if not creator_column or not date_column or not product_column:
-                raise KeyError(
-                    f"'{source['sheet_name']}' 시트에서 선택 상품의 제안날짜·크리에이터·"
-                    f"{product_label} 열을 찾지 못했습니다."
-                )
-            for item in completed:
-                row = int(item.get("row", 0) or 0)
-                creator = str(item.get("creator", "")).strip()
-                if row < 2 or normalize_creator(
-                    sheet.cell(row, creator_column).value
-                ) != normalize_creator(creator):
-                    skipped += 1
-                    continue
-                cell = sheet.cell(row, product_column)
-                if str(cell.value or "").strip():
-                    skipped += 1
-                    continue
-                cell.value = "찜"
-                date_preserved += int(
-                    bool(str(sheet.cell(row, int(date_column)).value or "").strip())
-                )
-                marked += 1
-            if marked:
-                ensure_backup()
-                save_atomic(workbook)
-        finally:
-            workbook.close()
-    drive = (
-        upload_dm_workbook_to_drive()
-        if marked
-        else {"status": "skipped", "message": "새로 표시할 명단이 없습니다."}
-    )
+    recorded = record_brand_connect_favorites(brand_key, product, completed)
     return {
         "sheet_name": source["sheet_name"],
-        "marked": marked,
-        "dated": dated,
-        "date_preserved": date_preserved,
-        "favorite_date": favorite_date,
-        "skipped": skipped,
-        "drive": drive,
+        "marked": 0,
+        "recorded": recorded,
+        "dated": 0,
+        "date_preserved": 0,
+        "skipped": max(0, len(completed) - recorded),
+        "drive": {
+            "status": "skipped",
+            "message": "Google Sheet에는 찜 표시를 남기지 않습니다.",
+        },
     }
 
 
@@ -3053,6 +3164,10 @@ def save_brand_connect_proposals(
     def relaxed_creator(value: object) -> str:
         return re.sub(r"[^0-9a-z가-힣]", "", str(value or "").casefold())
 
+    legacy_cleanup = cleanup_brand_connect_favorite_marks(
+        brand_key,
+        upload=False,
+    )
     matched = 0
     updated = 0
     links = 0
@@ -3060,7 +3175,7 @@ def save_brand_connect_proposals(
     reconciled = 0
     summary_rows = 0
     unmatched_names: list[str] = []
-    changed = False
+    changed = bool(legacy_cleanup.get("cleared", 0))
     with LOCK:
         workbook = load_workbook(
             CONFIG["_workbook_path"],
@@ -3200,10 +3315,10 @@ def save_brand_connect_proposals(
                         continue
                     date_cell = sheet.cell(row, date_column)
                     if current_status in PROPOSAL_STATUS_VALUES:
-                        status_cell.value = "찜"
+                        status_cell.value = None
                         reconciled += 1
                         changed = True
-                    if current_status in PROPOSAL_STATUS_VALUES or current_status == "찜":
+                    if current_status in PROPOSAL_STATUS_VALUES:
                         if str(date_cell.value or "").strip():
                             date_cell.value = None
                             changed = True

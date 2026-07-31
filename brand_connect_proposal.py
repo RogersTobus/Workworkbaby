@@ -53,6 +53,16 @@ def normalize_campaign_status(value: object) -> str:
     return ""
 
 
+def count_unique_creators(results: list[dict[str, Any]]) -> int:
+    return len(
+        {
+            re.sub(r"\s+", " ", str(item.get("creator", ""))).strip().casefold()
+            for item in results
+            if str(item.get("creator", "")).strip()
+        }
+    )
+
+
 def validate_campaign_url(value: object) -> str:
     url = str(value or "").strip()
     parsed = urllib.parse.urlparse(url)
@@ -575,7 +585,7 @@ class BrandConnectProposalManager:
                     pages_checked += campaign_pages
                     self._set(
                         processed_campaigns=index,
-                        creators_seen=len(results),
+                        creators_seen=count_unique_creators(results),
                         pages_checked=pages_checked,
                     )
                 except Exception as exc:

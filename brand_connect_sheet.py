@@ -2,6 +2,7 @@ from __future__ import annotations
 
 
 PROPOSAL_STATUS_VALUES = {"대기", "수락", "거절"}
+LEGACY_FAVORITE_VALUE = "찜"
 
 FAVORITE_DATE_HEADERS = {
     "alp": {
@@ -74,3 +75,7 @@ def row_has_proposal_status(
         in PROPOSAL_STATUS_VALUES
         for column in product_columns
     )
+
+
+def is_legacy_favorite_value(value: object) -> bool:
+    return str(value or "").strip() == LEGACY_FAVORITE_VALUE

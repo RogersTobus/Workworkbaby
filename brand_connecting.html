@@ -192,9 +192,9 @@
             </div>
             <div class="progress"><div id="favoriteProgress"></div></div>
             <div class="status-meta">
-              <div>찜 완료<b id="favoriteProcessed">0명</b></div>
-              <div>시트 찜 표시<b id="favoriteMarked">0명</b></div>
-              <div>검색 실패<b id="favoriteFailed">0명</b></div>
+              <div>요청 인원<b id="favoriteRequested">0명</b></div>
+              <div>찜 성공<b id="favoriteProcessed">0명</b></div>
+              <div>실패·제외<b id="favoriteFailed">0명</b></div>
             </div>
             <p id="favoriteGroupNote" class="background-note"></p>
           </div>
@@ -222,8 +222,8 @@
             </div>
             <div class="progress"><div id="proposalProgress"></div></div>
             <div class="status-meta">
-              <div>확인 인원<b id="proposalCreators">0명</b></div>
-              <div>시트 반영<b id="proposalUpdated">0건</b></div>
+              <div>중복 제외 인원<b id="proposalCreators">0명</b></div>
+              <div>시트 매칭<b id="proposalMatched">0건</b></div>
               <div>콘텐츠 링크<b id="proposalLinks">0건</b></div>
             </div>
             <p id="proposalNote" class="background-note">실행 직전 최신 Google Drive 원본을 읽습니다.</p>
@@ -304,7 +304,7 @@
     function updateFavoriteSummary(){
       const product=document.getElementById("favoriteProduct").selectedOptions[0]?.textContent||"";
       const count=document.getElementById("favoriteCount").value;
-      document.getElementById("favoriteSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · ${product} · <strong>실행 직전 Google 시트 최신화</strong> · <strong>선택 상품의 제안날짜와 상품 열이 모두 빈 사람</strong>부터 ${count}명 · 그룹 <strong>${todayGroupName()}</strong> · 완료 후 상품 열에 '찜' 표시 · 제안날짜는 실제 제안 확인 때 기록`;
+      document.getElementById("favoriteSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · ${product} · <strong>실행 직전 Google 시트 최신화</strong> · <strong>선택 상품의 제안날짜와 상품 열이 모두 빈 사람</strong>부터 ${count}명 · 그룹 <strong>${todayGroupName()}</strong> · Google Sheet에는 찜 표시를 남기지 않음`;
       document.getElementById("favoriteGroupNote").textContent=`사용할 찜 그룹: ${todayGroupName()} · 실행 중에도 다른 업무를 계속할 수 있습니다.`;
     }
     function updateProposalSummary(){
@@ -444,15 +444,17 @@
       latestFavoriteStatus=status;
       const running=runningStatuses.has(status.status);
       const visibleStatus=status.brand&&status.brand!==currentBrand
-        ? {status:"idle",message:"찜 자동화 대기 중",requested:0,processed:0,marked:0,dated:0,failed:0,group_name:""}
+        ? {status:"idle",message:"찜 자동화 대기 중",requested:0,processed:0,recorded:0,failed:0,group_name:""}
         : status;
       const requested=Number(visibleStatus.requested||0),processed=Number(visibleStatus.processed||0);
       favoriteIsRunning=running;
       document.getElementById("favoriteStatusMessage").textContent=visibleStatus.message||"찜 자동화 대기 중";
       document.getElementById("favoriteStatusBadge").textContent={idle:"대기",queued:"준비",preparing:"시트 확인",running:"진행 중",saving:"시트 저장",login_required:"로그인 필요",completed:"완료",completed_with_warning:"확인 필요",failed:"실패",stopped:"중단"}[visibleStatus.status]||visibleStatus.status;
+      document.getElementById("favoriteRequested").textContent=`${requested.toLocaleString()}명`;
       document.getElementById("favoriteProcessed").textContent=`${processed.toLocaleString()}명`;
-      document.getElementById("favoriteMarked").textContent=`${Number(visibleStatus.marked||0).toLocaleString()}명`;
-      document.getElementById("favoriteFailed").textContent=`${Number(visibleStatus.failed||0).toLocaleString()}명`;
+      const failed=Number(visibleStatus.failed||0);
+      const excluded=running?failed:Math.max(failed,requested-processed);
+      document.getElementById("favoriteFailed").textContent=`${excluded.toLocaleString()}명`;
       document.getElementById("favoriteProgress").style.width=`${requested?Math.min(100,processed/requested*100):0}%`;
       document.getElementById("resumeFavorite").hidden=visibleStatus.status!=="login_required";
       if(visibleStatus.group_name)document.getElementById("favoriteGroupNote").textContent=`사용할 찜 그룹: ${visibleStatus.group_name} · 실행 중에도 다른 업무를 계속할 수 있습니다.`;
@@ -465,14 +467,14 @@
       latestProposalStatus=status;
       const running=runningStatuses.has(status.status);
       const visibleStatus=status.brand&&status.brand!==currentBrand
-        ? {status:"idle",message:"제안 결과 확인 대기 중",campaign_count:0,processed_campaigns:0,creators_seen:0,updated:0,links:0,unmatched:0,errors:[]}
+        ? {status:"idle",message:"제안 결과 확인 대기 중",campaign_count:0,processed_campaigns:0,creators_seen:0,matched:0,links:0,unmatched:0,errors:[]}
         : status;
       const total=Number(visibleStatus.campaign_count||0),processed=Number(visibleStatus.processed_campaigns||0);
       proposalIsRunning=running;
       document.getElementById("proposalStatusMessage").textContent=visibleStatus.message||"제안 결과 확인 대기 중";
       document.getElementById("proposalStatusBadge").textContent={idle:"대기",queued:"준비",preparing:"원본 확인",running:"확인 중",saving:"시트 저장",login_required:"로그인 필요",completed:"완료",completed_with_warning:"확인 필요",failed:"실패",stopped:"중단"}[visibleStatus.status]||visibleStatus.status;
       document.getElementById("proposalCreators").textContent=`${Number(visibleStatus.creators_seen||0).toLocaleString()}명`;
-      document.getElementById("proposalUpdated").textContent=`${Number(visibleStatus.updated||0).toLocaleString()}건`;
+      document.getElementById("proposalMatched").textContent=`${Number(visibleStatus.matched||0).toLocaleString()}건`;
       document.getElementById("proposalLinks").textContent=`${Number(visibleStatus.links||0).toLocaleString()}건`;
       document.getElementById("proposalProgress").style.width=`${total?Math.min(100,processed/total*100):0}%`;
       document.getElementById("resumeProposal").hidden=visibleStatus.status!=="login_required";

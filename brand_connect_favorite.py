@@ -63,6 +63,7 @@ class BrandConnectFavoriteManager:
             "processed": 0,
             "failed": 0,
             "marked": 0,
+            "recorded": 0,
             "dated": 0,
             "date_preserved": 0,
             "group_name": "",
@@ -120,6 +121,7 @@ class BrandConnectFavoriteManager:
                 processed=0,
                 failed=0,
                 marked=0,
+                recorded=0,
                 dated=0,
                 date_preserved=0,
                 group_name=group_name,
@@ -408,7 +410,7 @@ class BrandConnectFavoriteManager:
                     )
             self._set(
                 status="saving",
-                message="완료된 명단을 시트에 '대기'와 찜 날짜로 표시합니다.",
+                message="완료된 명단을 앱 내부 찜 이력에 저장합니다.",
                 current_creator="",
             )
         except Exception as exc:
@@ -437,6 +439,7 @@ class BrandConnectFavoriteManager:
 
         result: dict[str, Any] = {
             "marked": 0,
+            "recorded": 0,
             "dated": 0,
             "date_preserved": 0,
             "drive": {"status": "skipped"},
@@ -446,6 +449,7 @@ class BrandConnectFavoriteManager:
                 result = self.persist_callback(brand, product, completed)
                 self._set(
                     marked=int(result.get("marked", 0) or 0),
+                    recorded=int(result.get("recorded", 0) or 0),
                     dated=int(result.get("dated", 0) or 0),
                     date_preserved=int(result.get("date_preserved", 0) or 0),
                 )
@@ -476,7 +480,7 @@ class BrandConnectFavoriteManager:
                 f"요청 {count}명 중 {len(completed)}명을 {group_name} 그룹에 추가했습니다."
             )
             requested_message += (
-                " 상품 열에는 '찜'으로 표시했고, 제안날짜는 실제 제안 확인 때 기록합니다."
+                " Google Sheet에는 찜 표시를 남기지 않았습니다."
             )
             if not drive_ok:
                 requested_message += f" {drive.get('message', 'Drive 최신화 확인이 필요합니다.')}"

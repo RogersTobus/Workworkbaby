@@ -4,12 +4,14 @@ from openpyxl import Workbook
 
 from brand_connect_proposal import (
     content_url_score,
+    count_unique_creators,
     normalize_campaign_status,
     normalize_proposal_date,
 )
 from brand_connect_sheet import (
     find_favorite_date_column,
     is_favorite_candidate,
+    is_legacy_favorite_value,
     row_has_proposal_status,
     set_favorite_date_if_blank,
     set_proposal_date_if_blank,
@@ -132,6 +134,22 @@ class BrandConnectProposalDateTest(unittest.TestCase):
 
         self.assertTrue(row_has_proposal_status(self.sheet, 2, [3, 4, 5]))
         self.assertFalse(row_has_proposal_status(self.sheet, 3, [3, 4, 5]))
+
+    def test_legacy_favorite_is_not_a_proposal_status(self):
+        self.assertTrue(is_legacy_favorite_value("찜"))
+        self.assertFalse(is_legacy_favorite_value("대기"))
+
+    def test_creator_count_removes_campaign_duplicates(self):
+        self.assertEqual(
+            count_unique_creators(
+                [
+                    {"creator": "같은 사람"},
+                    {"creator": " 같은   사람 "},
+                    {"creator": "다른 사람"},
+                ]
+            ),
+            2,
+        )
 
     def test_progress_status_is_accepted(self):
         self.assertEqual(normalize_campaign_status("진행 중"), "수락")
