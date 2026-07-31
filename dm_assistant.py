@@ -35,7 +35,7 @@ from brand_connect_proposal import (
     RUNNING_STATUSES as PROPOSAL_RUNNING_STATUSES,
     BrandConnectProposalManager,
 )
-from brand_connect_sheet import set_favorite_date_if_blank
+from brand_connect_sheet import is_favorite_candidate, set_favorite_date_if_blank
 from dm_templates import DM_MESSAGE_TEMPLATES
 from instagram_dm_sender import InstagramDMSenderManager
 from price_updater import PriceUpdateManager
@@ -2815,12 +2815,18 @@ def prepare_brand_connect_favorites(
                 if header:
                     headers.setdefault(header, column)
             creator_column = headers.get("크리에이터")
+            date_column = headers.get("제안날짜") or headers.get("제안일자")
             platform_column = headers.get("플랫폼")
             product_column = headers.get(product_label)
-            if not creator_column or not platform_column or not product_column:
+            if (
+                not creator_column
+                or not date_column
+                or not platform_column
+                or not product_column
+            ):
                 raise KeyError(
-                    f"'{source['sheet_name']}' 시트에서 크리에이터·플랫폼·"
-                    f"{product_label} 열을 찾지 못했습니다."
+                    f"'{source['sheet_name']}' 시트에서 제안날짜·크리에이터·"
+                    f"플랫폼·{product_label} 열을 찾지 못했습니다."
                 )
             candidates = []
             for row in range(2, sheet.max_row + 1):
@@ -2828,8 +2834,13 @@ def prepare_brand_connect_favorites(
                 row_platform = str(
                     sheet.cell(row, platform_column).value or ""
                 ).strip()
+                proposal_date = sheet.cell(row, date_column).value
                 selected = str(sheet.cell(row, product_column).value or "").strip()
-                if not creator or row_platform != platform_label or selected:
+                if (
+                    not creator
+                    or row_platform != platform_label
+                    or not is_favorite_candidate(proposal_date, selected)
+                ):
                     continue
                 candidates.append({"row": row, "creator": creator})
                 if len(candidates) >= count:

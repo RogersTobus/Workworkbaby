@@ -4,6 +4,7 @@ from openpyxl import Workbook
 
 from brand_connect_proposal import normalize_campaign_status
 from brand_connect_sheet import (
+    is_favorite_candidate,
     row_has_proposal_status,
     set_favorite_date_if_blank,
     set_proposal_date_if_blank,
@@ -70,6 +71,12 @@ class BrandConnectProposalDateTest(unittest.TestCase):
 
         self.assertFalse(changed)
         self.assertEqual(self.sheet["A2"].value, "2026.07.30")
+
+    def test_favorite_candidate_requires_blank_date_and_product(self):
+        self.assertTrue(is_favorite_candidate("", ""))
+        self.assertFalse(is_favorite_candidate("2026.07.31", ""))
+        self.assertFalse(is_favorite_candidate("", "대기"))
+        self.assertFalse(is_favorite_candidate("2026.07.31", "대기"))
 
     def test_recognizes_only_proposal_status_values(self):
         self.sheet.append(["", "creator", "대기", "", ""])

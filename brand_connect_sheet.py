@@ -4,6 +4,16 @@ from __future__ import annotations
 PROPOSAL_STATUS_VALUES = {"대기", "수락", "거절"}
 
 
+def is_favorite_candidate(
+    proposal_date: object,
+    selected_product: object,
+) -> bool:
+    """제안날짜와 선택 상품 열이 모두 비어 있을 때만 찜 후보로 인정한다."""
+    return not str(proposal_date or "").strip() and not str(
+        selected_product or ""
+    ).strip()
+
+
 def set_proposal_date_if_blank(
     sheet,
     row: int,
