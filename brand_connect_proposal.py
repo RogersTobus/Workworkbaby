@@ -8,10 +8,9 @@ import threading
 import time
 import urllib.parse
 import urllib.request
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
-from zoneinfo import ZoneInfo
 
 
 BRAND_CONNECT_ORIGIN = "https://brandconnect.naver.com"
@@ -42,6 +41,7 @@ CAMPAIGN_CHANNEL_LABELS = {
     "instagram": "인스타그램",
     "clip": "클립",
 }
+KOREA_TIMEZONE = timezone(timedelta(hours=9))
 
 
 def normalize_proposal_date(value: object) -> str:
@@ -70,7 +70,7 @@ def resolve_campaign_proposal_date(
     today: date | None = None,
 ) -> str:
     if channel == "clip":
-        current = today or datetime.now(ZoneInfo("Asia/Seoul")).date()
+        current = today or datetime.now(KOREA_TIMEZONE).date()
         return current.strftime("%Y.%m.%d")
     return normalize_proposal_date(value) if str(value or "").strip() else ""
 
