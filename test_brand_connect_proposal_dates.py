@@ -1,12 +1,15 @@
 import unittest
+from datetime import date
 
 from openpyxl import Workbook
 
 from brand_connect_proposal import (
     content_url_score,
     count_unique_creators,
+    normalize_campaign_channel,
     normalize_campaign_status,
     normalize_proposal_date,
+    resolve_campaign_proposal_date,
 )
 from brand_connect_sheet import (
     find_favorite_date_column,
@@ -172,6 +175,21 @@ class BrandConnectProposalDateTest(unittest.TestCase):
         self.assertEqual(normalize_campaign_status("진행 완료"), "수락")
         self.assertEqual(normalize_campaign_status("진행완료"), "수락")
         self.assertEqual(normalize_campaign_status("정산/확정 필요"), "수락")
+
+    def test_gaia_clip_uses_current_korea_date(self):
+        self.assertEqual(normalize_campaign_channel("clip", "gaia"), "clip")
+        self.assertEqual(
+            resolve_campaign_proposal_date(
+                "2020.01.01",
+                "clip",
+                today=date(2026, 8, 1),
+            ),
+            "2026.08.01",
+        )
+
+    def test_alp_cannot_use_clip_channel(self):
+        with self.assertRaises(ValueError):
+            normalize_campaign_channel("clip", "alp")
 
     def test_proposal_date_is_normalized(self):
         self.assertEqual(normalize_proposal_date("2026-07-30"), "2026.07.30")

@@ -31,10 +31,13 @@ from brand_connect_favorite import (
     BrandConnectFavoriteManager,
 )
 from brand_connect_proposal import (
+    CAMPAIGN_CHANNEL_LABELS,
     PRODUCT_LABELS as PROPOSAL_PRODUCT_LABELS,
     RUNNING_STATUSES as PROPOSAL_RUNNING_STATUSES,
     BrandConnectProposalManager,
+    normalize_campaign_channel,
     normalize_proposal_date,
+    resolve_campaign_proposal_date,
 )
 from brand_connect_sheet import (
     PROPOSAL_STATUS_VALUES,
@@ -3281,6 +3284,8 @@ def save_brand_connect_proposals(
                 creator = str(item.get("creator", "")).strip()
                 status = str(item.get("status", "")).strip()
                 content_url = str(item.get("content_url", "")).strip()
+                channel = str(item.get("channel", "")).strip()
+                channel_label = CAMPAIGN_CHANNEL_LABELS.get(channel, "")
                 rows = exact_rows.get(normalize_creator(creator), [])
                 relaxed_matches: list[int] = []
                 if not rows:
@@ -3318,7 +3323,9 @@ def save_brand_connect_proposals(
                             sheet.cell(row, column),
                         )
                     sheet.cell(row, creator_column).value = creator
-                    if platform_column and content_url:
+                    if platform_column and channel_label:
+                        sheet.cell(row, platform_column).value = channel_label
+                    elif platform_column and content_url:
                         host = urlparse(content_url).netloc.lower().split(":", 1)[0]
                         if host in {"instagram.com", "www.instagram.com"}:
                             sheet.cell(row, platform_column).value = "인스타그램"
@@ -3346,6 +3353,18 @@ def save_brand_connect_proposals(
                 for row in rows:
                     matched += 1
                     verified_rows[product].add(row)
+                    if platform_column and channel_label:
+                        platform_cell = sheet.cell(row, platform_column)
+                        current_platform = str(platform_cell.value or "").strip()
+                        if (
+                            current_platform != channel_label
+                            and not (
+                                current_platform == "클립"
+                                and channel_label != "클립"
+                            )
+                        ):
+                            platform_cell.value = channel_label
+                            changed = True
                     status_cell = sheet.cell(row, int(product_columns[product]))
                     if status and str(status_cell.value or "").strip() != status:
                         status_cell.value = status
@@ -3493,6 +3512,7 @@ def load_brand_connect_campaigns(brand: str) -> dict:
                 "url": str(row.get("url", ""))[:1000],
                 "product": product,
                 "proposal_date": str(row.get("proposal_date", "")).strip(),
+                "channel": normalize_campaign_channel(row.get("channel"), brand),
             }
         )
     if any(
@@ -3579,15 +3599,16 @@ def save_brand_connect_campaigns(payload: dict) -> dict:
         product = str(row.get("product", "")).strip()
         if product not in allowed_products:
             raise ValueError("브랜드에 맞는 상품을 선택해주세요.")
+        channel = normalize_campaign_channel(row.get("channel"), brand)
         campaigns.append(
             {
                 "url": str(row.get("url", "")).strip()[:1000],
                 "product": product,
-                "proposal_date": (
-                    normalize_proposal_date(row.get("proposal_date"))
-                    if str(row.get("proposal_date", "")).strip()
-                    else ""
+                "proposal_date": resolve_campaign_proposal_date(
+                    row.get("proposal_date"),
+                    channel,
                 ),
+                "channel": channel,
             }
         )
     with BRAND_CONNECT_CAMPAIGNS_LOCK:

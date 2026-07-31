@@ -8,9 +8,10 @@ import threading
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Callable
+from zoneinfo import ZoneInfo
 
 
 BRAND_CONNECT_ORIGIN = "https://brandconnect.naver.com"
@@ -36,6 +37,11 @@ ACCEPTED_CAMPAIGN_STATUS_KEYWORDS = (
     "수락",
     "선정",
 )
+CAMPAIGN_CHANNEL_LABELS = {
+    "blog": "블로그",
+    "instagram": "인스타그램",
+    "clip": "클립",
+}
 
 
 def normalize_proposal_date(value: object) -> str:
@@ -45,6 +51,28 @@ def normalize_proposal_date(value: object) -> str:
     except ValueError as exc:
         raise ValueError("제안날짜는 yyyy.mm.dd 형식으로 입력해주세요.") from exc
     return parsed.strftime("%Y.%m.%d")
+
+
+def normalize_campaign_channel(value: object, brand: str) -> str:
+    channel = str(value or "").strip().lower()
+    if not channel:
+        return ""
+    if channel not in CAMPAIGN_CHANNEL_LABELS:
+        raise ValueError("채널은 블로그·인스타그램·클립 중에서 선택해주세요.")
+    if channel == "clip" and brand != "gaia":
+        raise ValueError("클립 채널은 가이아에서만 사용할 수 있습니다.")
+    return channel
+
+
+def resolve_campaign_proposal_date(
+    value: object,
+    channel: str,
+    today: date | None = None,
+) -> str:
+    if channel == "clip":
+        current = today or datetime.now(ZoneInfo("Asia/Seoul")).date()
+        return current.strftime("%Y.%m.%d")
+    return normalize_proposal_date(value) if str(value or "").strip() else ""
 
 
 def normalize_campaign_status(value: object) -> str:
@@ -169,11 +197,10 @@ class BrandConnectProposalManager:
             product = str(item.get("product", "")).strip()
             if product not in PRODUCT_LABELS[brand]:
                 raise ValueError("선택한 브랜드에 맞는 상품을 선택해주세요.")
-            raw_proposal_date = str(item.get("proposal_date", "")).strip()
-            proposal_date = (
-                normalize_proposal_date(raw_proposal_date)
-                if raw_proposal_date
-                else ""
+            channel = normalize_campaign_channel(item.get("channel"), brand)
+            proposal_date = resolve_campaign_proposal_date(
+                item.get("proposal_date"),
+                channel,
             )
             key = (url, product)
             if key in seen_urls:
@@ -185,6 +212,7 @@ class BrandConnectProposalManager:
                     "product": product,
                     "product_label": PRODUCT_LABELS[brand][product],
                     "proposal_date": proposal_date,
+                    "channel": channel,
                 }
             )
         if not cleaned:
@@ -468,6 +496,7 @@ class BrandConnectProposalManager:
                     "product_label": campaign["product_label"],
                     "campaign_url": campaign["url"],
                     "proposal_date": campaign["proposal_date"],
+                    "channel": campaign.get("channel", ""),
                 }
             )
         return results
