@@ -10,11 +10,8 @@ def set_proposal_date_if_blank(
     date_column: int,
     date_text: str,
 ) -> bool:
-    cell = sheet.cell(row, date_column)
-    if str(cell.value or "").strip():
-        return False
-    cell.value = date_text
-    return True
+    """제안날짜는 사용자가 관리하므로 자동화에서 수정하지 않는다."""
+    return False
 
 
 def row_has_proposal_status(

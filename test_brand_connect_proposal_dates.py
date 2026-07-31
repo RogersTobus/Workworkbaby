@@ -15,7 +15,7 @@ class BrandConnectProposalDateTest(unittest.TestCase):
     def tearDown(self):
         self.workbook.close()
 
-    def test_sets_date_only_when_blank(self):
+    def test_automation_never_sets_blank_date(self):
         self.sheet.append(["", "creator", "수락", "", ""])
 
         changed = set_proposal_date_if_blank(
@@ -25,8 +25,8 @@ class BrandConnectProposalDateTest(unittest.TestCase):
             date_text="2026.07.30",
         )
 
-        self.assertTrue(changed)
-        self.assertEqual(self.sheet["A2"].value, "2026.07.30")
+        self.assertFalse(changed)
+        self.assertEqual(self.sheet["A2"].value, "")
 
     def test_preserves_existing_date(self):
         self.sheet.append(["2026.07.29", "creator", "거절", "", ""])

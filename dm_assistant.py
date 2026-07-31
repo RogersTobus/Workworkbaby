@@ -35,10 +35,6 @@ from brand_connect_proposal import (
     RUNNING_STATUSES as PROPOSAL_RUNNING_STATUSES,
     BrandConnectProposalManager,
 )
-from brand_connect_sheet import (
-    row_has_proposal_status,
-    set_proposal_date_if_blank,
-)
 from dm_templates import DM_MESSAGE_TEMPLATES
 from instagram_dm_sender import InstagramDMSenderManager
 from price_updater import PriceUpdateManager
@@ -2920,7 +2916,6 @@ def save_brand_connect_proposals(
     matched = 0
     updated = 0
     links = 0
-    dated = 0
     unmatched_names: list[str] = []
     changed = False
     with LOCK:
@@ -2937,7 +2932,6 @@ def save_brand_connect_proposals(
                 if header:
                     headers.setdefault(header, column)
             creator_column = headers.get("크리에이터")
-            date_column = headers.get("제안날짜") or headers.get("제안일자")
             content_header = "콘텐츠 제출" if brand_key == "alp" else "콘텐츠 링크"
             content_column = headers.get(content_header)
             product_columns = {
@@ -2947,10 +2941,6 @@ def save_brand_connect_proposals(
             if not creator_column:
                 raise KeyError(
                     f"'{source['sheet_name']}' 시트에서 크리에이터 열을 찾지 못했습니다."
-                )
-            if not date_column:
-                raise KeyError(
-                    f"'{source['sheet_name']}' 시트에서 제안날짜 열을 찾지 못했습니다."
                 )
             missing_products = [
                 label
@@ -3002,14 +2992,6 @@ def save_brand_connect_proposals(
                 for row in rows:
                     matched += 1
                     status_cell = sheet.cell(row, int(product_columns[product]))
-                    if status and set_proposal_date_if_blank(
-                        sheet,
-                        row,
-                        int(date_column),
-                        date.today().strftime("%Y.%m.%d"),
-                    ):
-                        dated += 1
-                        changed = True
                     if status and str(status_cell.value or "").strip() != status:
                         status_cell.value = status
                         updated += 1
@@ -3037,7 +3019,8 @@ def save_brand_connect_proposals(
         "matched": matched,
         "updated": updated,
         "links": links,
-        "dated": dated,
+        "dated": 0,
+        "proposal_dates_untouched": True,
         "unmatched": len(unmatched_names),
         "unmatched_names": unmatched_names[:30],
         "drive": drive,
@@ -3048,77 +3031,16 @@ def backfill_brand_connect_proposal_dates(
     proposal_date: str | None = None,
     sync_first: bool = True,
 ) -> dict:
-    if sync_first:
-        sync = sync_dm_workbook(force=True)
-        if str(sync.get("status", "")) in {"failed", "login_required", "error"}:
-            raise RuntimeError(
-                sync.get("message") or "Google Drive 최신화에 실패했습니다."
-            )
-
-    date_text = proposal_date or date.today().strftime("%Y.%m.%d")
-    counts: dict[str, int] = {}
-    changed = False
-    with LOCK:
-        workbook = load_workbook(
-            CONFIG["_workbook_path"],
-            data_only=False,
-            keep_links=True,
-        )
-        try:
-            for brand_key, source in BRAND_CONNECTING_SHEETS.items():
-                sheet = workbook[source["sheet_name"]]
-                headers = {}
-                for column in range(1, sheet.max_column + 1):
-                    header = str(sheet.cell(1, column).value or "").strip()
-                    if header:
-                        headers.setdefault(header, column)
-                date_column = headers.get("제안날짜") or headers.get("제안일자")
-                product_columns = [
-                    headers.get(label)
-                    for label in PROPOSAL_PRODUCT_LABELS[brand_key].values()
-                ]
-                if not date_column or any(column is None for column in product_columns):
-                    raise KeyError(
-                        f"'{source['sheet_name']}' 시트의 제안날짜·상품 상태 열을 "
-                        "확인해주세요."
-                    )
-                filled = 0
-                integer_product_columns = [
-                    int(column) for column in product_columns if column is not None
-                ]
-                for row in range(2, sheet.max_row + 1):
-                    if not row_has_proposal_status(
-                        sheet,
-                        row,
-                        integer_product_columns,
-                    ):
-                        continue
-                    if set_proposal_date_if_blank(
-                        sheet,
-                        row,
-                        int(date_column),
-                        date_text,
-                    ):
-                        filled += 1
-                        changed = True
-                counts[brand_key] = filled
-            if changed:
-                ensure_backup()
-                save_atomic(workbook)
-        finally:
-            workbook.close()
-
-    drive = (
-        upload_dm_workbook_to_drive()
-        if changed
-        else {"status": "skipped", "message": "보완할 제안날짜가 없습니다."}
-    )
     return {
-        "date": date_text,
-        "alp": counts.get("alp", 0),
-        "gaia": counts.get("gaia", 0),
-        "total": sum(counts.values()),
-        "drive": drive,
+        "date": proposal_date or "",
+        "alp": 0,
+        "gaia": 0,
+        "total": 0,
+        "proposal_dates_untouched": True,
+        "drive": {
+            "status": "skipped",
+            "message": "제안날짜 자동 입력이 비활성화되어 있습니다.",
+        },
     }
 
 
