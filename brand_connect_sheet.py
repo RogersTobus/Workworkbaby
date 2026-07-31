@@ -14,6 +14,20 @@ def set_proposal_date_if_blank(
     return False
 
 
+def set_favorite_date_if_blank(
+    sheet,
+    row: int,
+    date_column: int,
+    date_text: str,
+) -> bool:
+    """찜 자동화가 성공한 행의 빈 제안날짜만 찜 완료일로 채운다."""
+    cell = sheet.cell(row, date_column)
+    if str(cell.value or "").strip():
+        return False
+    cell.value = date_text
+    return True
+
+
 def row_has_proposal_status(
     sheet,
     row: int,

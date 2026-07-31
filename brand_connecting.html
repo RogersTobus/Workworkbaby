@@ -192,7 +192,7 @@
             <div class="progress"><div id="favoriteProgress"></div></div>
             <div class="status-meta">
               <div>찜 완료<b id="favoriteProcessed">0명</b></div>
-              <div>시트 표시<b id="favoriteMarked">0명</b></div>
+              <div>시트/날짜<b id="favoriteMarked">0명 / 신규 0명</b></div>
               <div>검색 실패<b id="favoriteFailed">0명</b></div>
             </div>
             <p id="favoriteGroupNote" class="background-note"></p>
@@ -299,7 +299,7 @@
     function updateFavoriteSummary(){
       const product=document.getElementById("favoriteProduct").selectedOptions[0]?.textContent||"";
       const count=document.getElementById("favoriteCount").value;
-      document.getElementById("favoriteSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · ${product} · <strong>실행 직전 Google 시트 최신화</strong> · 선택 열이 빈칸인 사람부터 <strong>${count}명</strong> · 그룹 <strong>${todayGroupName()}</strong> · 완료 후 해당 상품 열에 '대기' 표시`;
+      document.getElementById("favoriteSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · ${product} · <strong>실행 직전 Google 시트 최신화</strong> · 선택 열이 빈칸인 사람부터 <strong>${count}명</strong> · 그룹 <strong>${todayGroupName()}</strong> · 완료 후 상품 열에 '대기', 빈 A열에 찜 날짜(yyyy.mm.dd) 표시`;
       document.getElementById("favoriteGroupNote").textContent=`사용할 찜 그룹: ${todayGroupName()} · 실행 중에도 다른 업무를 계속할 수 있습니다.`;
     }
     function updateProposalSummary(){
@@ -425,14 +425,14 @@
       latestFavoriteStatus=status;
       const running=runningStatuses.has(status.status);
       const visibleStatus=status.brand&&status.brand!==currentBrand
-        ? {status:"idle",message:"찜 자동화 대기 중",requested:0,processed:0,marked:0,failed:0,group_name:""}
+        ? {status:"idle",message:"찜 자동화 대기 중",requested:0,processed:0,marked:0,dated:0,failed:0,group_name:""}
         : status;
       const requested=Number(visibleStatus.requested||0),processed=Number(visibleStatus.processed||0);
       favoriteIsRunning=running;
       document.getElementById("favoriteStatusMessage").textContent=visibleStatus.message||"찜 자동화 대기 중";
       document.getElementById("favoriteStatusBadge").textContent={idle:"대기",queued:"준비",preparing:"시트 확인",running:"진행 중",saving:"시트 저장",login_required:"로그인 필요",completed:"완료",completed_with_warning:"확인 필요",failed:"실패",stopped:"중단"}[visibleStatus.status]||visibleStatus.status;
       document.getElementById("favoriteProcessed").textContent=`${processed.toLocaleString()}명`;
-      document.getElementById("favoriteMarked").textContent=`${Number(visibleStatus.marked||0).toLocaleString()}명`;
+      document.getElementById("favoriteMarked").textContent=`${Number(visibleStatus.marked||0).toLocaleString()}명 / 신규 ${Number(visibleStatus.dated||0).toLocaleString()}명`;
       document.getElementById("favoriteFailed").textContent=`${Number(visibleStatus.failed||0).toLocaleString()}명`;
       document.getElementById("favoriteProgress").style.width=`${requested?Math.min(100,processed/requested*100):0}%`;
       document.getElementById("resumeFavorite").hidden=visibleStatus.status!=="login_required";

@@ -63,6 +63,8 @@ class BrandConnectFavoriteManager:
             "processed": 0,
             "failed": 0,
             "marked": 0,
+            "dated": 0,
+            "date_preserved": 0,
             "group_name": "",
             "current_creator": "",
             "started_at": None,
@@ -118,6 +120,8 @@ class BrandConnectFavoriteManager:
                 processed=0,
                 failed=0,
                 marked=0,
+                dated=0,
+                date_preserved=0,
                 group_name=group_name,
                 current_creator="",
                 started_at=datetime.now().isoformat(timespec="seconds"),
@@ -404,7 +408,7 @@ class BrandConnectFavoriteManager:
                     )
             self._set(
                 status="saving",
-                message="완료된 명단을 시트에 '대기'로 표시합니다.",
+                message="완료된 명단을 시트에 '대기'와 찜 날짜로 표시합니다.",
                 current_creator="",
             )
         except Exception as exc:
@@ -433,12 +437,18 @@ class BrandConnectFavoriteManager:
 
         result: dict[str, Any] = {
             "marked": 0,
+            "dated": 0,
+            "date_preserved": 0,
             "drive": {"status": "skipped"},
         }
         if completed:
             try:
                 result = self.persist_callback(brand, product, completed)
-                self._set(marked=int(result.get("marked", 0) or 0))
+                self._set(
+                    marked=int(result.get("marked", 0) or 0),
+                    dated=int(result.get("dated", 0) or 0),
+                    date_preserved=int(result.get("date_preserved", 0) or 0),
+                )
             except Exception as exc:
                 terminal_error = terminal_error or exc
 
@@ -464,6 +474,10 @@ class BrandConnectFavoriteManager:
         else:
             requested_message = (
                 f"요청 {count}명 중 {len(completed)}명을 {group_name} 그룹에 추가했습니다."
+            )
+            requested_message += (
+                f" A열 찜 날짜 신규 {int(result.get('dated', 0) or 0)}명, "
+                f"기존 날짜 유지 {int(result.get('date_preserved', 0) or 0)}명."
             )
             if not drive_ok:
                 requested_message += f" {drive.get('message', 'Drive 최신화 확인이 필요합니다.')}"

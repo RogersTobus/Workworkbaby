@@ -3,7 +3,11 @@ import unittest
 from openpyxl import Workbook
 
 from brand_connect_proposal import normalize_campaign_status
-from brand_connect_sheet import row_has_proposal_status, set_proposal_date_if_blank
+from brand_connect_sheet import (
+    row_has_proposal_status,
+    set_favorite_date_if_blank,
+    set_proposal_date_if_blank,
+)
 
 
 class BrandConnectProposalDateTest(unittest.TestCase):
@@ -40,6 +44,32 @@ class BrandConnectProposalDateTest(unittest.TestCase):
 
         self.assertFalse(changed)
         self.assertEqual(self.sheet["A2"].value, "2026.07.29")
+
+    def test_favorite_sets_date_only_when_blank(self):
+        self.sheet.append(["", "creator", "", "", ""])
+
+        changed = set_favorite_date_if_blank(
+            self.sheet,
+            row=2,
+            date_column=1,
+            date_text="2026.07.31",
+        )
+
+        self.assertTrue(changed)
+        self.assertEqual(self.sheet["A2"].value, "2026.07.31")
+
+    def test_favorite_preserves_existing_date(self):
+        self.sheet.append(["2026.07.30", "creator", "", "", ""])
+
+        changed = set_favorite_date_if_blank(
+            self.sheet,
+            row=2,
+            date_column=1,
+            date_text="2026.07.31",
+        )
+
+        self.assertFalse(changed)
+        self.assertEqual(self.sheet["A2"].value, "2026.07.30")
 
     def test_recognizes_only_proposal_status_values(self):
         self.sheet.append(["", "creator", "대기", "", ""])

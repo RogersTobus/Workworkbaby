@@ -35,6 +35,7 @@ from brand_connect_proposal import (
     RUNNING_STATUSES as PROPOSAL_RUNNING_STATUSES,
     BrandConnectProposalManager,
 )
+from brand_connect_sheet import set_favorite_date_if_blank
 from dm_templates import DM_MESSAGE_TEMPLATES
 from instagram_dm_sender import InstagramDMSenderManager
 from price_updater import PriceUpdateManager
@@ -2848,7 +2849,10 @@ def save_brand_connect_favorites(
     if source is None or not product_label:
         raise ValueError("올바른 브랜드·상품을 선택해주세요.")
     marked = 0
+    dated = 0
+    date_preserved = 0
     skipped = 0
+    favorite_date = date.today().strftime("%Y.%m.%d")
     with LOCK:
         workbook = load_workbook(
             CONFIG["_workbook_path"],
@@ -2863,10 +2867,11 @@ def save_brand_connect_favorites(
                 if header:
                     headers.setdefault(header, column)
             creator_column = headers.get("크리에이터")
+            date_column = headers.get("제안날짜") or headers.get("제안일자")
             product_column = headers.get(product_label)
-            if not creator_column or not product_column:
+            if not creator_column or not date_column or not product_column:
                 raise KeyError(
-                    f"'{source['sheet_name']}' 시트에서 크리에이터·"
+                    f"'{source['sheet_name']}' 시트에서 제안날짜·크리에이터·"
                     f"{product_label} 열을 찾지 못했습니다."
                 )
             for item in completed:
@@ -2882,6 +2887,15 @@ def save_brand_connect_favorites(
                     skipped += 1
                     continue
                 cell.value = "대기"
+                if set_favorite_date_if_blank(
+                    sheet,
+                    row,
+                    int(date_column),
+                    favorite_date,
+                ):
+                    dated += 1
+                else:
+                    date_preserved += 1
                 marked += 1
             if marked:
                 ensure_backup()
@@ -2896,6 +2910,9 @@ def save_brand_connect_favorites(
     return {
         "sheet_name": source["sheet_name"],
         "marked": marked,
+        "dated": dated,
+        "date_preserved": date_preserved,
+        "favorite_date": favorite_date,
         "skipped": skipped,
         "drive": drive,
     }
