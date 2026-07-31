@@ -17,6 +17,16 @@ FAVORITE_DATE_HEADERS = {
 }
 
 
+def first_header_columns(sheet) -> dict[str, int]:
+    """중복 헤더가 있으면 왼쪽의 실제 데이터 열을 우선한다."""
+    headers: dict[str, int] = {}
+    for column in range(1, sheet.max_column + 1):
+        header = str(sheet.cell(1, column).value or "").strip()
+        if header:
+            headers.setdefault(header, column)
+    return headers
+
+
 def find_favorite_date_column(
     headers: dict[str, int],
     brand_key: str,
@@ -79,3 +89,14 @@ def row_has_proposal_status(
 
 def is_legacy_favorite_value(value: object) -> bool:
     return str(value or "").strip() == LEGACY_FAVORITE_VALUE
+
+
+def should_add_missing_campaign_creator(
+    status: object,
+    relaxed_matches: list[int],
+) -> bool:
+    """확인된 제안 상태이며 기존 유사 행도 없을 때만 새 명단으로 추가한다."""
+    return (
+        str(status or "").strip() in PROPOSAL_STATUS_VALUES
+        and not relaxed_matches
+    )

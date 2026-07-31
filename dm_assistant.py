@@ -38,9 +38,11 @@ from brand_connect_proposal import (
 )
 from brand_connect_sheet import (
     PROPOSAL_STATUS_VALUES,
+    first_header_columns,
     find_favorite_date_column,
     is_favorite_candidate,
     is_legacy_favorite_value,
+    should_add_missing_campaign_creator,
 )
 from dm_templates import DM_MESSAGE_TEMPLATES
 from instagram_dm_sender import InstagramDMSenderManager
@@ -2693,12 +2695,18 @@ def prepare_brand_connect_crawl(brand_key: str) -> set[str]:
         try:
             sheet = workbook[source["sheet_name"]]
             sheet.calculate_dimension(force=True)
+            headers = first_header_columns(sheet)
+            creator_column = headers.get("크리에이터")
+            if not creator_column:
+                raise KeyError(
+                    f"'{source['sheet_name']}' 시트에서 크리에이터 열을 찾지 못했습니다."
+                )
             creators = set()
             for row in sheet.iter_rows(
                 min_row=2,
                 max_row=sheet.max_row,
-                min_col=2,
-                max_col=2,
+                min_col=creator_column,
+                max_col=creator_column,
                 values_only=True,
             ):
                 key = normalize_creator(row[0] if row else "")
@@ -2727,17 +2735,45 @@ def save_brand_connect_results(
         )
         try:
             sheet = workbook[sheet_name]
-            existing = {
-                normalize_creator(sheet.cell(row, 2).value)
-                for row in range(2, sheet.max_row + 1)
-                if normalize_creator(sheet.cell(row, 2).value)
+            headers = {
+                str(sheet.cell(1, column).value or "").strip(): column
+                for column in range(1, sheet.max_column + 1)
+                if str(sheet.cell(1, column).value or "").strip()
             }
-            available_rows = [
+            required_headers = (
+                "크리에이터",
+                "활동주제",
+                "플랫폼",
+                "콘텐츠 제휴 진행 이력",
+                "일평균 방문 수",
+            )
+            missing_headers = [header for header in required_headers if not headers.get(header)]
+            if missing_headers:
+                raise KeyError(
+                    f"'{sheet_name}' 시트에서 {', '.join(missing_headers)} 열을 찾지 못했습니다."
+                )
+            creator_column = int(headers["크리에이터"])
+            data_columns = [int(headers[header]) for header in required_headers]
+            existing = {
+                normalize_creator(sheet.cell(row, creator_column).value)
+                for row in range(2, sheet.max_row + 1)
+                if normalize_creator(sheet.cell(row, creator_column).value)
+            }
+            creator_rows = [
                 row
                 for row in range(2, sheet.max_row + 1)
-                if not str(sheet.cell(row, 2).value or "").strip()
+                if str(sheet.cell(row, creator_column).value or "").strip()
             ]
-            next_append_row = sheet.max_row + 1
+            last_creator_row = max(creator_rows, default=1)
+            available_rows = [
+                row
+                for row in range(2, last_creator_row + 1)
+                if not any(
+                    str(sheet.cell(row, column).value or "").strip()
+                    for column in data_columns
+                )
+            ]
+            next_append_row = last_creator_row + 1
             for candidate in candidates:
                 creator = str(candidate.get("creator", "")).strip()
                 creator_key = normalize_creator(creator)
@@ -2749,34 +2785,26 @@ def save_brand_connect_results(
                 else:
                     row = next_append_row
                     next_append_row += 1
-                    template_row = max(2, row - 1)
-                    for column in range(2, 6):
+                    template_row = max(2, last_creator_row)
+                    for column in data_columns:
                         copy_cell_style(
                             sheet.cell(template_row, column),
                             sheet.cell(row, column),
                         )
                 history_count = int(candidate.get("history_count", 0) or 0)
                 audience_count = int(candidate.get("audience_count", 0) or 0)
-                if brand_key == "alp":
-                    values = [
-                        creator,
-                        str(candidate.get("topics", "")).strip(),
-                        history_count,
-                        audience_count if audience_count else "",
-                        "대기",
-                    ]
-                else:
-                    values = [
-                        creator,
-                        str(candidate.get("topics", "")).strip(),
-                        str(candidate.get("platform", "")).strip(),
-                        history_count,
-                        audience_count if audience_count else "",
-                    ]
-                for offset, value in enumerate(values, start=2):
-                    sheet.cell(row, offset).value = value
+                values = {
+                    "크리에이터": creator,
+                    "활동주제": str(candidate.get("topics", "")).strip(),
+                    "플랫폼": str(candidate.get("platform", "")).strip(),
+                    "콘텐츠 제휴 진행 이력": history_count,
+                    "일평균 방문 수": audience_count if audience_count else "",
+                }
+                for header, value in values.items():
+                    sheet.cell(row, int(headers[header])).value = value
                 existing.add(creator_key)
                 added += 1
+                last_creator_row = max(last_creator_row, row)
             if added:
                 ensure_backup()
                 save_atomic(workbook)
@@ -2890,11 +2918,7 @@ def cleanup_brand_connect_favorite_marks(
         )
         try:
             sheet = workbook[source["sheet_name"]]
-            headers = {
-                str(sheet.cell(1, column).value or "").strip(): column
-                for column in range(1, sheet.max_column + 1)
-                if str(sheet.cell(1, column).value or "").strip()
-            }
+            headers = first_header_columns(sheet)
             creator_column = headers.get("크리에이터")
             platform_column = headers.get("플랫폼")
             if not creator_column or not platform_column:
@@ -3170,6 +3194,7 @@ def save_brand_connect_proposals(
     )
     matched = 0
     updated = 0
+    added = 0
     links = 0
     dated = 0
     reconciled = 0
@@ -3192,6 +3217,7 @@ def save_brand_connect_proposals(
             creator_column = headers.get("크리에이터")
             content_header = "콘텐츠 제출" if brand_key == "alp" else "콘텐츠 링크"
             content_column = headers.get(content_header)
+            platform_column = headers.get("플랫폼")
             product_columns = {
                 product: headers.get(label)
                 for product, label in product_labels.items()
@@ -3253,17 +3279,62 @@ def save_brand_connect_proposals(
             }
             for (product, _), item in merged.items():
                 creator = str(item.get("creator", "")).strip()
+                status = str(item.get("status", "")).strip()
+                content_url = str(item.get("content_url", "")).strip()
                 rows = exact_rows.get(normalize_creator(creator), [])
+                relaxed_matches: list[int] = []
                 if not rows:
                     relaxed = relaxed_creator(creator)
                     relaxed_matches = relaxed_rows.get(relaxed, []) if relaxed else []
                     if len(relaxed_matches) == 1:
                         rows = relaxed_matches
+                if (
+                    not rows
+                    and should_add_missing_campaign_creator(
+                        status,
+                        relaxed_matches,
+                    )
+                ):
+                    existing_creator_rows = [
+                        row
+                        for row_numbers in exact_rows.values()
+                        for row in row_numbers
+                    ]
+                    template_row = max(existing_creator_rows, default=2)
+                    row = template_row + 1 if existing_creator_rows else 2
+                    while str(sheet.cell(row, creator_column).value or "").strip():
+                        row += 1
+                    data_columns = [
+                        creator_column,
+                        content_column,
+                        *[int(column) for column in product_columns.values()],
+                        *[int(column) for column in date_columns.values()],
+                    ]
+                    if platform_column:
+                        data_columns.append(platform_column)
+                    for column in range(1, max(data_columns) + 1):
+                        copy_cell_style(
+                            sheet.cell(template_row, column),
+                            sheet.cell(row, column),
+                        )
+                    sheet.cell(row, creator_column).value = creator
+                    if platform_column and content_url:
+                        host = urlparse(content_url).netloc.lower().split(":", 1)[0]
+                        if host in {"instagram.com", "www.instagram.com"}:
+                            sheet.cell(row, platform_column).value = "인스타그램"
+                        elif host in {"blog.naver.com", "m.blog.naver.com"}:
+                            sheet.cell(row, platform_column).value = "블로그"
+                    creator_key = normalize_creator(creator)
+                    exact_rows.setdefault(creator_key, []).append(row)
+                    relaxed_key = relaxed_creator(creator)
+                    if relaxed_key:
+                        relaxed_rows.setdefault(relaxed_key, []).append(row)
+                    rows = [row]
+                    added += 1
+                    changed = True
                 if not rows:
                     unmatched_names.append(creator)
                     continue
-                status = str(item.get("status", "")).strip()
-                content_url = str(item.get("content_url", "")).strip()
                 raw_proposal_date = str(
                     item.get("proposal_date", "")
                 ).strip()
@@ -3347,6 +3418,7 @@ def save_brand_connect_proposals(
         "sheet_name": source["sheet_name"],
         "matched": matched,
         "updated": updated,
+        "added": added,
         "links": links,
         "dated": dated,
         "reconciled": reconciled,

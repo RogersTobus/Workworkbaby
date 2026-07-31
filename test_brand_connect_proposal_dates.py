@@ -10,11 +10,13 @@ from brand_connect_proposal import (
 )
 from brand_connect_sheet import (
     find_favorite_date_column,
+    first_header_columns,
     is_favorite_candidate,
     is_legacy_favorite_value,
     row_has_proposal_status,
     set_favorite_date_if_blank,
     set_proposal_date_if_blank,
+    should_add_missing_campaign_creator,
 )
 
 
@@ -138,6 +140,19 @@ class BrandConnectProposalDateTest(unittest.TestCase):
     def test_legacy_favorite_is_not_a_proposal_status(self):
         self.assertTrue(is_legacy_favorite_value("찜"))
         self.assertFalse(is_legacy_favorite_value("대기"))
+
+    def test_all_campaign_statuses_add_a_missing_creator(self):
+        for status in ("대기", "수락", "거절"):
+            with self.subTest(status=status):
+                self.assertTrue(should_add_missing_campaign_creator(status, []))
+        self.assertFalse(should_add_missing_campaign_creator("찜", []))
+        self.assertFalse(should_add_missing_campaign_creator("수락", [12, 13]))
+
+    def test_duplicate_summary_header_does_not_replace_product_column(self):
+        self.sheet["C1"] = "기존 상태"
+        self.sheet["G1"] = "오일"
+        self.sheet["O1"] = "오일"
+        self.assertEqual(first_header_columns(self.sheet)["오일"], 7)
 
     def test_creator_count_removes_campaign_duplicates(self):
         self.assertEqual(

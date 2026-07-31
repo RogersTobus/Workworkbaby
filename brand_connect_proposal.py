@@ -133,6 +133,7 @@ class BrandConnectProposalManager:
             "creators_seen": 0,
             "matched": 0,
             "updated": 0,
+            "added": 0,
             "dated": 0,
             "reconciled": 0,
             "summary_rows": 0,
@@ -205,6 +206,7 @@ class BrandConnectProposalManager:
                 creators_seen=0,
                 matched=0,
                 updated=0,
+                added=0,
                 dated=0,
                 reconciled=0,
                 summary_rows=0,
@@ -626,6 +628,7 @@ class BrandConnectProposalManager:
             self._set(
                 matched=int(saved.get("matched", 0)),
                 updated=int(saved.get("updated", 0)),
+                added=int(saved.get("added", 0)),
                 dated=int(saved.get("dated", 0)),
                 reconciled=int(saved.get("reconciled", 0)),
                 summary_rows=int(saved.get("summary_rows", 0)),
@@ -671,9 +674,13 @@ class BrandConnectProposalManager:
             )
         else:
             updated = int(self.snapshot().get("updated", 0))
+            added = int(self.snapshot().get("added", 0))
             self._set(
                 status="completed_with_warning" if errors else "completed",
-                message=f"제안 결과 확인 완료 · 시트 {updated}건 반영",
+                message=(
+                    f"제안 결과 확인 완료 · 시트 {updated}건 반영"
+                    + (f" · 시트 신규 {added}명 추가" if added else "")
+                ),
                 errors=errors[-20:],
                 current_campaign="",
                 finished_at=finished_at,

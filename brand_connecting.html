@@ -467,7 +467,7 @@
       latestProposalStatus=status;
       const running=runningStatuses.has(status.status);
       const visibleStatus=status.brand&&status.brand!==currentBrand
-        ? {status:"idle",message:"제안 결과 확인 대기 중",campaign_count:0,processed_campaigns:0,creators_seen:0,matched:0,links:0,unmatched:0,errors:[]}
+        ? {status:"idle",message:"제안 결과 확인 대기 중",campaign_count:0,processed_campaigns:0,creators_seen:0,matched:0,added:0,links:0,unmatched:0,errors:[]}
         : status;
       const total=Number(visibleStatus.campaign_count||0),processed=Number(visibleStatus.processed_campaigns||0);
       proposalIsRunning=running;
@@ -478,7 +478,7 @@
       document.getElementById("proposalLinks").textContent=`${Number(visibleStatus.links||0).toLocaleString()}건`;
       document.getElementById("proposalProgress").style.width=`${total?Math.min(100,processed/total*100):0}%`;
       document.getElementById("resumeProposal").hidden=visibleStatus.status!=="login_required";
-      document.getElementById("proposalNote").textContent=visibleStatus.current_campaign?`확인 중: ${visibleStatus.current_campaign} · 확인 페이지 ${Number(visibleStatus.pages_checked||0).toLocaleString()}개`:`확인 페이지 ${Number(visibleStatus.pages_checked||0).toLocaleString()}개 · 잘못 표시된 기존 제안 ${Number(visibleStatus.reconciled||0).toLocaleString()}명 정리 · 날짜 ${Number(visibleStatus.dated||0).toLocaleString()}명 보정 · 시트 미매칭 ${Number(visibleStatus.unmatched||0).toLocaleString()}명`;
+      document.getElementById("proposalNote").textContent=visibleStatus.current_campaign?`확인 중: ${visibleStatus.current_campaign} · 확인 페이지 ${Number(visibleStatus.pages_checked||0).toLocaleString()}개`:`확인 페이지 ${Number(visibleStatus.pages_checked||0).toLocaleString()}개 · 시트 신규 ${Number(visibleStatus.added||0).toLocaleString()}명 추가 · 잘못 표시된 기존 제안 ${Number(visibleStatus.reconciled||0).toLocaleString()}명 정리 · 날짜 ${Number(visibleStatus.dated||0).toLocaleString()}명 보정 · 시트 미매칭 ${Number(visibleStatus.unmatched||0).toLocaleString()}명`;
       const errors=document.getElementById("proposalErrors");
       errors.replaceChildren();
       (visibleStatus.errors||[]).forEach(message=>{
