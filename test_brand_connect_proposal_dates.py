@@ -3,6 +3,7 @@ import unittest
 from openpyxl import Workbook
 
 from brand_connect_proposal import (
+    content_url_score,
     normalize_campaign_status,
     normalize_proposal_date,
 )
@@ -135,6 +136,7 @@ class BrandConnectProposalDateTest(unittest.TestCase):
     def test_progress_status_is_accepted(self):
         self.assertEqual(normalize_campaign_status("진행 중"), "수락")
         self.assertEqual(normalize_campaign_status("진행중"), "수락")
+        self.assertEqual(normalize_campaign_status("진행 완료"), "수락")
 
     def test_proposal_date_is_normalized(self):
         self.assertEqual(normalize_proposal_date("2026-07-30"), "2026.07.30")
@@ -143,6 +145,22 @@ class BrandConnectProposalDateTest(unittest.TestCase):
     def test_invalid_proposal_date_is_rejected(self):
         with self.assertRaises(ValueError):
             normalize_proposal_date("2026.07.40")
+
+    def test_submitted_creator_content_beats_visible_help_links(self):
+        self.assertGreater(
+            content_url_score("https://www.instagram.com/p/DbJ_N5WEkU8/"),
+            content_url_score("https://blog.naver.com/brandconnect/223327624176"),
+        )
+
+    def test_creator_blog_is_content_but_brandconnect_help_blog_is_not(self):
+        self.assertGreater(
+            content_url_score("https://blog.naver.com/example_creator/223123456789"),
+            0,
+        )
+        self.assertEqual(
+            content_url_score("https://blog.naver.com/brandconnect/223327624176"),
+            0,
+        )
 
 
 

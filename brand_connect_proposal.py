@@ -47,7 +47,7 @@ def normalize_campaign_status(value: object) -> str:
         return "대기"
     if any(
         keyword in compact
-        for keyword in ("정산", "확정", "진행중", "수락", "선정")
+        for keyword in ("정산", "확정", "진행중", "진행완료", "수락", "선정")
     ):
         return "수락"
     return ""
@@ -63,6 +63,29 @@ def validate_campaign_url(value: object) -> str:
     return urllib.parse.urlunparse(
         (parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", "", "")
     )
+
+
+def content_url_score(value: object) -> int:
+    """Return a preference score for a submitted creator-content URL."""
+    url = str(value or "").strip()
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        return 0
+    host = parsed.netloc.lower().split(":", 1)[0]
+    path = parsed.path.lower()
+    if host in {"instagram.com", "www.instagram.com"}:
+        return 100 if re.search(r"/(?:p|reel|tv)/", path) else 80
+    if host in {"blog.naver.com", "m.blog.naver.com"}:
+        if path.strip("/").split("/", 1)[0] == "brandconnect":
+            return 0
+        return 95
+    if host in {"youtube.com", "www.youtube.com", "youtu.be"}:
+        return 90
+    if host.endswith("naver.com") or host.endswith("navercorp.com"):
+        return 0
+    if host == "brandconnect.naver.com":
+        return 0
+    return 10
 
 
 class BrandConnectProposalManager:
@@ -331,7 +354,7 @@ class BrandConnectProposalManager:
             return ""
         cell = submitted_cells.first
         cell_text = re.sub(r"\s+", "", cell.inner_text(timeout=2500))
-        if re.search(r"(?:0/\d+|0건)제출", cell_text):
+        if re.search(r"(?:0/\d+건|0건)제출", cell_text):
             return ""
         button = cell.get_by_role("button", name="조회/수정", exact=True)
         if button.count() < 1:
@@ -339,13 +362,26 @@ class BrandConnectProposalManager:
         if button.count() < 1:
             return ""
         pages_before = list(page.context.pages)
-        hrefs_before = {
-            str(anchor.get_attribute("href") or "").strip()
-            for anchor in page.locator('a[href^="http"]').all()
-        }
         button.first.click(timeout=5000)
         page.wait_for_timeout(700)
-        candidates: list[str] = []
+        candidates: list[tuple[int, str]] = []
+
+        def add_visible_links(scope: Any) -> None:
+            try:
+                anchors = scope.locator('a[href]').all()
+            except Exception:
+                return
+            for anchor in anchors:
+                try:
+                    if not anchor.is_visible():
+                        continue
+                    href = str(anchor.get_attribute("href") or "").strip()
+                    score = content_url_score(href)
+                    if score and all(existing != href for _, existing in candidates):
+                        candidates.append((score, href))
+                except Exception:
+                    continue
+
         overlay_selectors = (
             '[role="dialog"]:visible',
             '[class*="Modal"]:visible',
@@ -358,27 +394,13 @@ class BrandConnectProposalManager:
                 overlay = page.locator(selector)
                 if overlay.count() < 1:
                     continue
-                for anchor in overlay.last.locator('a[href^="http"]').all():
-                    href = str(anchor.get_attribute("href") or "").strip()
-                    if not href or "brandconnect.naver.com" in href:
-                        continue
-                    if href not in candidates:
-                        candidates.append(href)
+                add_visible_links(overlay.last)
             except Exception:
                 continue
         if not candidates:
             for current_page in page.context.pages:
                 try:
-                    for anchor in current_page.locator('a[href^="http"]').all():
-                        href = str(anchor.get_attribute("href") or "").strip()
-                        if (
-                            not href
-                            or "brandconnect.naver.com" in href
-                            or (current_page == page and href in hrefs_before)
-                        ):
-                            continue
-                        if href not in candidates:
-                            candidates.append(href)
+                    add_visible_links(current_page)
                 except Exception:
                     continue
         for current_page in list(page.context.pages):
@@ -388,7 +410,8 @@ class BrandConnectProposalManager:
                 except Exception:
                     pass
         BrandConnectProposalManager._close_overlay(page)
-        return candidates[0] if candidates else ""
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[0][1] if candidates else ""
 
     def _read_current_page(
         self,
