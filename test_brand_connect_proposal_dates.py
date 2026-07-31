@@ -155,6 +155,8 @@ class BrandConnectProposalDateTest(unittest.TestCase):
         self.assertEqual(normalize_campaign_status("진행 중"), "수락")
         self.assertEqual(normalize_campaign_status("진행중"), "수락")
         self.assertEqual(normalize_campaign_status("진행 완료"), "수락")
+        self.assertEqual(normalize_campaign_status("진행완료"), "수락")
+        self.assertEqual(normalize_campaign_status("정산/확정 필요"), "수락")
 
     def test_proposal_date_is_normalized(self):
         self.assertEqual(normalize_proposal_date("2026-07-30"), "2026.07.30")

@@ -27,6 +27,15 @@ PRODUCT_LABELS = {
     },
 }
 RUNNING_STATUSES = {"queued", "preparing", "running", "saving", "login_required"}
+ACCEPTED_CAMPAIGN_STATUS_KEYWORDS = (
+    "정산/확정필요",
+    "진행완료",
+    "진행중",
+    "정산",
+    "확정",
+    "수락",
+    "선정",
+)
 
 
 def normalize_proposal_date(value: object) -> str:
@@ -45,10 +54,7 @@ def normalize_campaign_status(value: object) -> str:
         return "거절"
     if "수락대기" in compact or compact == "대기":
         return "대기"
-    if any(
-        keyword in compact
-        for keyword in ("정산", "확정", "진행중", "진행완료", "수락", "선정")
-    ):
+    if any(keyword in compact for keyword in ACCEPTED_CAMPAIGN_STATUS_KEYWORDS):
         return "수락"
     return ""
 
