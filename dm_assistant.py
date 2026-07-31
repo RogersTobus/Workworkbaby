@@ -31,7 +31,6 @@ from brand_connect_favorite import (
     BrandConnectFavoriteManager,
 )
 from brand_connect_proposal import (
-    CAMPAIGN_CHANNEL_LABELS,
     PRODUCT_LABELS as PROPOSAL_PRODUCT_LABELS,
     RUNNING_STATUSES as PROPOSAL_RUNNING_STATUSES,
     BrandConnectProposalManager,
@@ -3285,7 +3284,6 @@ def save_brand_connect_proposals(
                 status = str(item.get("status", "")).strip()
                 content_url = str(item.get("content_url", "")).strip()
                 channel = str(item.get("channel", "")).strip()
-                channel_label = CAMPAIGN_CHANNEL_LABELS.get(channel, "")
                 rows = exact_rows.get(normalize_creator(creator), [])
                 relaxed_matches: list[int] = []
                 if not rows:
@@ -3323,14 +3321,8 @@ def save_brand_connect_proposals(
                             sheet.cell(row, column),
                         )
                     sheet.cell(row, creator_column).value = creator
-                    if platform_column and channel_label:
-                        sheet.cell(row, platform_column).value = channel_label
-                    elif platform_column and content_url:
-                        host = urlparse(content_url).netloc.lower().split(":", 1)[0]
-                        if host in {"instagram.com", "www.instagram.com"}:
-                            sheet.cell(row, platform_column).value = "인스타그램"
-                        elif host in {"blog.naver.com", "m.blog.naver.com"}:
-                            sheet.cell(row, platform_column).value = "블로그"
+                    if platform_column and channel == "clip":
+                        sheet.cell(row, platform_column).value = "클립"
                     creator_key = normalize_creator(creator)
                     exact_rows.setdefault(creator_key, []).append(row)
                     relaxed_key = relaxed_creator(creator)
@@ -3353,17 +3345,11 @@ def save_brand_connect_proposals(
                 for row in rows:
                     matched += 1
                     verified_rows[product].add(row)
-                    if platform_column and channel_label:
+                    if platform_column and channel == "clip":
                         platform_cell = sheet.cell(row, platform_column)
                         current_platform = str(platform_cell.value or "").strip()
-                        if (
-                            current_platform != channel_label
-                            and not (
-                                current_platform == "클립"
-                                and channel_label != "클립"
-                            )
-                        ):
-                            platform_cell.value = channel_label
+                        if current_platform != "클립":
+                            platform_cell.value = "클립"
                             changed = True
                     status_cell = sheet.cell(row, int(product_columns[product]))
                     if status and str(status_cell.value or "").strip() != status:

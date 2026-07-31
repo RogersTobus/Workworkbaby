@@ -68,7 +68,8 @@
     .favorite-stop{color:var(--green);background:#fff;border:1px solid #b9cbc1}
     .favorite-actions button:disabled{cursor:not-allowed;opacity:.45}
     .campaign-list{display:grid;gap:10px;margin-bottom:11px}
-    .campaign-row{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(145px,.55fr) minmax(130px,.48fr) minmax(135px,.48fr) 46px;gap:9px;align-items:center}
+    .campaign-row{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(170px,.65fr) minmax(145px,.5fr) 46px;gap:9px;align-items:center}
+    .campaign-row.has-channel{grid-template-columns:minmax(0,1.55fr) minmax(145px,.55fr) minmax(150px,.52fr) minmax(135px,.48fr) 46px}
     .campaign-row input,.campaign-row select{width:100%;height:46px;border:1px solid #cfd9d2;border-radius:12px;background:#fbfcfb;padding:0 13px;color:var(--ink);font:700 14px "Segoe UI","Malgun Gothic",sans-serif;outline:none}
     .campaign-row input:focus,.campaign-row select:focus{border-color:#76a68b;box-shadow:0 0 0 3px rgba(23,89,64,.10)}
     .remove-campaign{height:46px;padding:0;color:#9c4b4b;background:#fff1f1;border:1px solid #f0cece}
@@ -260,20 +261,9 @@
         {value:"pouch",label:"파우치"}
       ]
     };
-    const campaignChannels={
-      alp:[
-        {value:"blog",label:"블로그"},
-        {value:"instagram",label:"인스타그램"}
-      ],
-      gaia:[
-        {value:"blog",label:"블로그"},
-        {value:"instagram",label:"인스타그램"},
-        {value:"clip",label:"클립"}
-      ]
-    };
     const proposalRowsByBrand={
-      alp:[{url:"",product:"immun",channel:"blog",proposal_date:""}],
-      gaia:[{url:"",product:"oil",channel:"blog",proposal_date:""}]
+      alp:[{url:"",product:"immun",channel:"",proposal_date:""}],
+      gaia:[{url:"",product:"oil",channel:"",proposal_date:""}]
     };
     const proposalSaveTimers={alp:null,gaia:null};
     let currentBrand="alp",pollTimer=null,favoritePollTimer=null,proposalPollTimer=null;
@@ -324,7 +314,7 @@
       const dated=rows.filter(row=>row.url.trim()&&String(row.proposal_date||"").trim()).length;
       const clips=rows.filter(row=>row.url.trim()&&row.channel==="clip").length;
       const contentColumn=currentBrand==="alp"?"K열":"L열";
-      document.getElementById("proposalSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · 등록 링크 <strong>${filled}개</strong> · 날짜 지정 <strong>${dated}개</strong>${currentBrand==="gaia"?` · 클립 <strong>${clips}개</strong>`:""} · 채널은 C열에 블로그·인스타그램·클립으로 표시 · 모든 페이지 확인 후 상태·제안날짜·오른쪽 날짜별 집계표 최신화 · 제출 콘텐츠는 <strong>${contentColumn}</strong>에 링크 저장 · <strong>실행 직전 Google 시트 최신화</strong>`;
+      document.getElementById("proposalSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · 등록 링크 <strong>${filled}개</strong> · 날짜 지정 <strong>${dated}개</strong>${currentBrand==="gaia"?` · 클립 <strong>${clips}개</strong> · 클립일 때만 C열에 표시`:""} · 모든 페이지 확인 후 상태·제안날짜·오른쪽 날짜별 집계표 최신화 · 제출 콘텐츠는 <strong>${contentColumn}</strong>에 링크 저장 · <strong>실행 직전 Google 시트 최신화</strong>`;
     }
     function saveCampaignRows(brand=currentBrand,immediate=false){
       const campaigns=proposalRowsByBrand[brand].map(row=>({
@@ -348,7 +338,7 @@
       for(const brand of ["alp","gaia"]){
         try{
           const saved=await request(`/api/brand-connecting/proposal/campaigns?brand=${brand}`);
-          if(Array.isArray(saved.campaigns))proposalRowsByBrand[brand]=saved.campaigns;
+          if(Array.isArray(saved.campaigns))proposalRowsByBrand[brand]=saved.campaigns.map(row=>({...row,channel:row.channel==="clip"?"clip":""}));
         }catch(error){
           document.getElementById("proposalStatusMessage").textContent=`저장된 링크 불러오기 실패: ${error.message}`;
         }
@@ -360,6 +350,7 @@
       proposalRowsByBrand[currentBrand].forEach((row,index)=>{
         const wrapper=document.createElement("div");
         wrapper.className="campaign-row";
+        if(currentBrand==="gaia")wrapper.classList.add("has-channel");
         const input=document.createElement("input");
         input.type="url";
         input.placeholder="https://brandconnect.naver.com/.../campaign/.../progress";
@@ -381,30 +372,31 @@
           row.product=select.value;
           saveCampaignRows();
         });
-        const channelSelect=document.createElement("select");
-        channelSelect.setAttribute("aria-label",`캠페인 채널 ${index+1}`);
-        const emptyChannel=document.createElement("option");
-        emptyChannel.value="";emptyChannel.textContent="채널 선택";channelSelect.append(emptyChannel);
-        campaignChannels[currentBrand].forEach(channel=>{
-          const option=document.createElement("option");
-          option.value=channel.value;option.textContent=channel.label;channelSelect.append(option);
-        });
-        channelSelect.value=row.channel||"";
+        let channelSelect=null;
+        if(currentBrand==="gaia"){
+          channelSelect=document.createElement("select");
+          channelSelect.setAttribute("aria-label",`캠페인 채널 ${index+1}`);
+          [{value:"",label:"일반 · C열 유지"},{value:"clip",label:"클립"}].forEach(channel=>{
+            const option=document.createElement("option");
+            option.value=channel.value;option.textContent=channel.label;channelSelect.append(option);
+          });
+          channelSelect.value=row.channel==="clip"?"clip":"";
+        }
         const dateInput=document.createElement("input");
         dateInput.type="text";
         dateInput.inputMode="numeric";
         dateInput.placeholder="yyyy.mm.dd";
         dateInput.setAttribute("aria-label",`캠페인 제안날짜 ${index+1}`);
         dateInput.value=row.proposal_date||"";
-        channelSelect.addEventListener("change",()=>{
-          row.channel=channelSelect.value;
-          if(row.channel==="clip"){
-            row.proposal_date=todayProposalDate();
-            dateInput.value=row.proposal_date;
-          }
-          updateProposalSummary();
-          saveCampaignRows();
-        });
+        if(channelSelect)channelSelect.addEventListener("change",()=>{
+            row.channel=channelSelect.value;
+            if(row.channel==="clip"){
+              row.proposal_date=todayProposalDate();
+              dateInput.value=row.proposal_date;
+            }
+            updateProposalSummary();
+            saveCampaignRows();
+          });
         dateInput.addEventListener("input",()=>{
           row.proposal_date=dateInput.value;
           updateProposalSummary();
@@ -419,7 +411,9 @@
           saveCampaignRows(currentBrand,true);
           renderCampaignRows();
         });
-        wrapper.append(input,select,channelSelect,dateInput,remove);
+        wrapper.append(input,select);
+        if(channelSelect)wrapper.append(channelSelect);
+        wrapper.append(dateInput,remove);
         container.append(wrapper);
       });
       updateProposalSummary();
@@ -431,7 +425,7 @@
         document.getElementById("proposalStatusMessage").textContent="한 번에 최대 20개까지 등록할 수 있습니다.";
         return;
       }
-      rows.push({url:"",product:campaignProducts[currentBrand][0].value,channel:"blog",proposal_date:todayProposalDate()});
+      rows.push({url:"",product:campaignProducts[currentBrand][0].value,channel:"",proposal_date:todayProposalDate()});
       saveCampaignRows();
       renderCampaignRows();
     }
