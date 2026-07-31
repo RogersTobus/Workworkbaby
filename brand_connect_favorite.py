@@ -476,8 +476,7 @@ class BrandConnectFavoriteManager:
                 f"요청 {count}명 중 {len(completed)}명을 {group_name} 그룹에 추가했습니다."
             )
             requested_message += (
-                f" 제안날짜 열 신규 {int(result.get('dated', 0) or 0)}명, "
-                f"기존 날짜 유지 {int(result.get('date_preserved', 0) or 0)}명."
+                " 상품 열에는 '찜'으로 표시했고, 제안날짜는 실제 제안 확인 때 기록합니다."
             )
             if not drive_ok:
                 requested_message += f" {drive.get('message', 'Drive 최신화 확인이 필요합니다.')}"

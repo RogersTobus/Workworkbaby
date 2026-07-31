@@ -34,11 +34,12 @@ from brand_connect_proposal import (
     PRODUCT_LABELS as PROPOSAL_PRODUCT_LABELS,
     RUNNING_STATUSES as PROPOSAL_RUNNING_STATUSES,
     BrandConnectProposalManager,
+    normalize_proposal_date,
 )
 from brand_connect_sheet import (
+    PROPOSAL_STATUS_VALUES,
     find_favorite_date_column,
     is_favorite_candidate,
-    set_favorite_date_if_blank,
 )
 from dm_templates import DM_MESSAGE_TEMPLATES
 from instagram_dm_sender import InstagramDMSenderManager
@@ -69,7 +70,7 @@ BRAND_CONNECTING_SHEETS = {
     "gaia": {
         "brand_name": "가이아",
         "sheet_name": "가이아 쇼핑커넥트",
-        "column_count": 10,
+        "column_count": 12,
     },
 }
 OUTLOOK_POPUP_SCRIPT_PATH = APP_DIR / "open_new_outlook_draft.ps1"
@@ -2909,16 +2910,10 @@ def save_brand_connect_favorites(
                 if str(cell.value or "").strip():
                     skipped += 1
                     continue
-                cell.value = "대기"
-                if set_favorite_date_if_blank(
-                    sheet,
-                    row,
-                    int(date_column),
-                    favorite_date,
-                ):
-                    dated += 1
-                else:
-                    date_preserved += 1
+                cell.value = "찜"
+                date_preserved += int(
+                    bool(str(sheet.cell(row, int(date_column)).value or "").strip())
+                )
                 marked += 1
             if marked:
                 ensure_backup()
@@ -2941,9 +2936,113 @@ def save_brand_connect_favorites(
     }
 
 
+def rebuild_brand_connect_proposal_summary(
+    sheet,
+    brand_key: str,
+    headers: dict[str, int],
+    product_columns: dict[str, int | None],
+) -> tuple[int, bool]:
+    products = tuple(product_columns)
+    product_labels = PROPOSAL_PRODUCT_LABELS[brand_key]
+    date_columns = {
+        product: find_favorite_date_column(headers, brand_key, product)
+        for product in products
+    }
+    summary_date_column = next(
+        (
+            column
+            for column in range(1, sheet.max_column + 1)
+            if str(sheet.cell(1, column).value or "").strip() == "날짜"
+        ),
+        None,
+    )
+    if not summary_date_column:
+        return 0, False
+    summary_columns: dict[str, int] = {}
+    for column in range(summary_date_column + 1, sheet.max_column + 1):
+        compact = re.sub(
+            r"\s+",
+            "",
+            str(sheet.cell(1, column).value or ""),
+        )
+        for product, label in product_labels.items():
+            if compact == re.sub(r"\s+", "", label):
+                summary_columns[product] = column
+    if (
+        set(summary_columns) != set(products)
+        or not all(date_columns.values())
+    ):
+        return 0, False
+
+    counts: dict[str, dict[str, int]] = {}
+    creator_column = headers.get("크리에이터")
+    if not creator_column:
+        return 0, False
+    for row in range(2, sheet.max_row + 1):
+        if not str(sheet.cell(row, creator_column).value or "").strip():
+            continue
+        for product in products:
+            status = str(
+                sheet.cell(row, int(product_columns[product])).value or ""
+            ).strip()
+            if status not in PROPOSAL_STATUS_VALUES:
+                continue
+            raw_date = sheet.cell(row, int(date_columns[product])).value
+            try:
+                proposal_date = normalize_proposal_date(raw_date)
+            except ValueError:
+                continue
+            counts.setdefault(
+                proposal_date,
+                {item: 0 for item in products},
+            )[product] += 1
+
+    dates = sorted(
+        counts,
+        key=lambda value: datetime.strptime(value, "%Y.%m.%d"),
+    )
+    last_existing = 1
+    for row in range(2, min(sheet.max_row, 200) + 1):
+        if any(
+            sheet.cell(row, column).value not in (None, "")
+            for column in (
+                summary_date_column,
+                *(summary_columns[product] for product in products),
+            )
+        ):
+            last_existing = row
+    last_target = max(last_existing, len(dates) + 1)
+    changed = False
+    style_row = 2
+    for row in range(2, last_target + 1):
+        values = (
+            (
+                dates[row - 2],
+                *(counts[dates[row - 2]][product] for product in products),
+            )
+            if row - 2 < len(dates)
+            else tuple(None for _ in range(len(products) + 1))
+        )
+        for column, value in zip(
+            (
+                summary_date_column,
+                *(summary_columns[product] for product in products),
+            ),
+            values,
+        ):
+            cell = sheet.cell(row, column)
+            if cell.value != value:
+                cell.value = value
+                changed = True
+            if row > style_row:
+                copy_cell_style(sheet.cell(style_row, column), cell)
+    return len(dates), changed
+
+
 def save_brand_connect_proposals(
     brand_key: str,
     results: list[dict],
+    reconciliation_campaigns: list[dict] | None = None,
 ) -> dict:
     source = BRAND_CONNECTING_SHEETS.get(brand_key)
     product_labels = PROPOSAL_PRODUCT_LABELS.get(brand_key, {})
@@ -2956,6 +3055,9 @@ def save_brand_connect_proposals(
     matched = 0
     updated = 0
     links = 0
+    dated = 0
+    reconciled = 0
+    summary_rows = 0
     unmatched_names: list[str] = []
     changed = False
     with LOCK:
@@ -2978,6 +3080,10 @@ def save_brand_connect_proposals(
                 product: headers.get(label)
                 for product, label in product_labels.items()
             }
+            date_columns = {
+                product: find_favorite_date_column(headers, brand_key, product)
+                for product in product_labels
+            }
             if not creator_column:
                 raise KeyError(
                     f"'{source['sheet_name']}' 시트에서 크리에이터 열을 찾지 못했습니다."
@@ -2991,6 +3097,16 @@ def save_brand_connect_proposals(
                 raise KeyError(
                     f"'{source['sheet_name']}' 시트에서 "
                     f"{', '.join(missing_products)} 열을 찾지 못했습니다."
+                )
+            missing_dates = [
+                product_labels[product]
+                for product, column in date_columns.items()
+                if not column
+            ]
+            if missing_dates:
+                raise KeyError(
+                    f"'{source['sheet_name']}' 시트에서 "
+                    f"{', '.join(missing_dates)} 제안날짜 열을 찾지 못했습니다."
                 )
             if not content_column:
                 raise KeyError(
@@ -3016,6 +3132,9 @@ def save_brand_connect_proposals(
                     continue
                 merged[(product, normalize_creator(creator))] = dict(item)
 
+            verified_rows: dict[str, set[int]] = {
+                product: set() for product in product_labels
+            }
             for (product, _), item in merged.items():
                 creator = str(item.get("creator", "")).strip()
                 rows = exact_rows.get(normalize_creator(creator), [])
@@ -3029,12 +3148,28 @@ def save_brand_connect_proposals(
                     continue
                 status = str(item.get("status", "")).strip()
                 content_url = str(item.get("content_url", "")).strip()
+                raw_proposal_date = str(
+                    item.get("proposal_date", "")
+                ).strip()
+                proposal_date = (
+                    normalize_proposal_date(raw_proposal_date)
+                    if raw_proposal_date
+                    else ""
+                )
                 for row in rows:
                     matched += 1
+                    verified_rows[product].add(row)
                     status_cell = sheet.cell(row, int(product_columns[product]))
                     if status and str(status_cell.value or "").strip() != status:
                         status_cell.value = status
                         updated += 1
+                        changed = True
+                    date_cell = sheet.cell(row, int(date_columns[product]))
+                    if proposal_date and str(
+                        date_cell.value or ""
+                    ).strip() != proposal_date:
+                        date_cell.value = proposal_date
+                        dated += 1
                         changed = True
                     if content_url:
                         content_cell = sheet.cell(row, content_column)
@@ -3044,7 +3179,45 @@ def save_brand_connect_proposals(
                             content_cell.style = "Hyperlink"
                             links += 1
                             changed = True
+            reconcile_products = {
+                str(campaign.get("product", "")).strip()
+                for campaign in (reconciliation_campaigns or [])
+                if str(campaign.get("product", "")).strip() in product_columns
+                and str(campaign.get("proposal_date", "")).strip()
+            }
+            for product in reconcile_products:
+                status_column = int(product_columns[product])
+                date_column = int(date_columns[product])
+                for row in range(2, sheet.max_row + 1):
+                    if not str(
+                        sheet.cell(row, creator_column).value or ""
+                    ).strip():
+                        continue
+                    status_cell = sheet.cell(row, status_column)
+                    current_status = str(status_cell.value or "").strip()
+                    if row in verified_rows[product]:
+                        continue
+                    date_cell = sheet.cell(row, date_column)
+                    if current_status in PROPOSAL_STATUS_VALUES:
+                        status_cell.value = "찜"
+                        reconciled += 1
+                        changed = True
+                    if current_status in PROPOSAL_STATUS_VALUES or current_status == "찜":
+                        if str(date_cell.value or "").strip():
+                            date_cell.value = None
+                            changed = True
+            if brand_key in {"alp", "gaia"}:
+                summary_rows, summary_changed = rebuild_brand_connect_proposal_summary(
+                    sheet,
+                    brand_key,
+                    headers,
+                    product_columns,
+                )
+                changed = changed or summary_changed
             if changed:
+                workbook.calculation.calcMode = "auto"
+                workbook.calculation.fullCalcOnLoad = True
+                workbook.calculation.forceFullCalc = True
                 ensure_backup()
                 save_atomic(workbook)
         finally:
@@ -3059,8 +3232,9 @@ def save_brand_connect_proposals(
         "matched": matched,
         "updated": updated,
         "links": links,
-        "dated": 0,
-        "proposal_dates_untouched": True,
+        "dated": dated,
+        "reconciled": reconciled,
+        "summary_rows": summary_rows,
         "unmatched": len(unmatched_names),
         "unmatched_names": unmatched_names[:30],
         "drive": drive,
@@ -3130,8 +3304,70 @@ def load_brand_connect_campaigns(brand: str) -> dict:
             {
                 "url": str(row.get("url", ""))[:1000],
                 "product": product,
+                "proposal_date": str(row.get("proposal_date", "")).strip(),
             }
         )
+    if any(
+        not campaign["proposal_date"] for campaign in campaigns
+    ):
+        sync_dm_workbook(force=True)
+        with LOCK:
+            workbook = load_workbook(
+                CONFIG["_workbook_path"],
+                data_only=True,
+                keep_links=True,
+            )
+            try:
+                sheet = workbook[BRAND_CONNECTING_SHEETS[brand]["sheet_name"]]
+                product_labels = PROPOSAL_PRODUCT_LABELS[brand]
+                date_queues = {product: [] for product in product_labels}
+                summary_date_column = next(
+                    (
+                        column
+                        for column in range(1, sheet.max_column + 1)
+                        if str(sheet.cell(1, column).value or "").strip()
+                        == "날짜"
+                    ),
+                    None,
+                )
+                summary_columns: dict[str, int] = {}
+                if summary_date_column:
+                    for column in range(
+                        summary_date_column + 1,
+                        sheet.max_column + 1,
+                    ):
+                        compact = re.sub(
+                            r"\s+",
+                            "",
+                            str(sheet.cell(1, column).value or ""),
+                        )
+                        for product, label in product_labels.items():
+                            if compact == re.sub(r"\s+", "", label):
+                                summary_columns[product] = column
+                for row in range(2, min(sheet.max_row, 200) + 1):
+                    if not summary_date_column:
+                        break
+                    raw_date = sheet.cell(row, summary_date_column).value
+                    if raw_date in (None, ""):
+                        continue
+                    try:
+                        proposal_date = normalize_proposal_date(raw_date)
+                    except ValueError:
+                        continue
+                    for product, column in summary_columns.items():
+                        if int(sheet.cell(row, column).value or 0) > 0:
+                            date_queues[product].append(proposal_date)
+                queue_indexes = {product: 0 for product in product_labels}
+                for campaign in campaigns:
+                    if campaign["proposal_date"]:
+                        continue
+                    product = campaign["product"]
+                    index = queue_indexes[product]
+                    if index < len(date_queues[product]):
+                        campaign["proposal_date"] = date_queues[product][index]
+                        queue_indexes[product] += 1
+            finally:
+                workbook.close()
     return {"brand": brand, "campaigns": campaigns}
 
 
@@ -3159,6 +3395,11 @@ def save_brand_connect_campaigns(payload: dict) -> dict:
             {
                 "url": str(row.get("url", "")).strip()[:1000],
                 "product": product,
+                "proposal_date": (
+                    normalize_proposal_date(row.get("proposal_date"))
+                    if str(row.get("proposal_date", "")).strip()
+                    else ""
+                ),
             }
         )
     with BRAND_CONNECT_CAMPAIGNS_LOCK:

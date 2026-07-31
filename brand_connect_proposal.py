@@ -8,6 +8,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -26,6 +27,15 @@ PRODUCT_LABELS = {
     },
 }
 RUNNING_STATUSES = {"queued", "preparing", "running", "saving", "login_required"}
+
+
+def normalize_proposal_date(value: object) -> str:
+    text = str(value or "").strip().replace("-", ".")
+    try:
+        parsed = datetime.strptime(text, "%Y.%m.%d")
+    except ValueError as exc:
+        raise ValueError("제안날짜는 yyyy.mm.dd 형식으로 입력해주세요.") from exc
+    return parsed.strftime("%Y.%m.%d")
 
 
 def normalize_campaign_status(value: object) -> str:
@@ -60,7 +70,10 @@ class BrandConnectProposalManager:
         self,
         app_dir: Path,
         sync_callback: Callable[[], dict[str, Any]],
-        persist_callback: Callable[[str, list[dict[str, Any]]], dict[str, Any]],
+        persist_callback: Callable[
+            [str, list[dict[str, Any]], list[dict[str, Any]]],
+            dict[str, Any],
+        ],
     ):
         self.app_dir = Path(app_dir)
         self.sync_callback = sync_callback
@@ -77,9 +90,13 @@ class BrandConnectProposalManager:
             "brand": "",
             "campaign_count": 0,
             "processed_campaigns": 0,
+            "pages_checked": 0,
             "creators_seen": 0,
             "matched": 0,
             "updated": 0,
+            "dated": 0,
+            "reconciled": 0,
+            "summary_rows": 0,
             "links": 0,
             "unmatched": 0,
             "failed": 0,
@@ -112,6 +129,12 @@ class BrandConnectProposalManager:
             product = str(item.get("product", "")).strip()
             if product not in PRODUCT_LABELS[brand]:
                 raise ValueError("선택한 브랜드에 맞는 상품을 선택해주세요.")
+            raw_proposal_date = str(item.get("proposal_date", "")).strip()
+            proposal_date = (
+                normalize_proposal_date(raw_proposal_date)
+                if raw_proposal_date
+                else ""
+            )
             key = (url, product)
             if key in seen_urls:
                 continue
@@ -121,6 +144,7 @@ class BrandConnectProposalManager:
                     "url": url,
                     "product": product,
                     "product_label": PRODUCT_LABELS[brand][product],
+                    "proposal_date": proposal_date,
                 }
             )
         if not cleaned:
@@ -138,9 +162,13 @@ class BrandConnectProposalManager:
                 brand=brand,
                 campaign_count=len(cleaned),
                 processed_campaigns=0,
+                pages_checked=0,
                 creators_seen=0,
                 matched=0,
                 updated=0,
+                dated=0,
+                reconciled=0,
+                summary_rows=0,
                 links=0,
                 unmatched=0,
                 failed=0,
@@ -398,6 +426,7 @@ class BrandConnectProposalManager:
                     "product": campaign["product"],
                     "product_label": campaign["product_label"],
                     "campaign_url": campaign["url"],
+                    "proposal_date": campaign["proposal_date"],
                 }
             )
         return results
@@ -430,13 +459,14 @@ class BrandConnectProposalManager:
         self,
         page: Any,
         campaign: dict[str, str],
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], int]:
         self._navigate(page, campaign["url"])
         if not self._wait_for_login(page, campaign["url"]):
             raise RuntimeError("네이버 브랜드커넥트 로그인을 확인하지 못했습니다.")
         page.locator("table").first.wait_for(state="visible", timeout=15_000)
         all_results: list[dict[str, Any]] = []
         seen_pages: set[str] = set()
+        pages_checked = 0
         for _ in range(100):
             if self.stop_event.is_set():
                 break
@@ -448,18 +478,30 @@ class BrandConnectProposalManager:
             if marker in seen_pages:
                 break
             seen_pages.add(marker)
+            pages_checked += 1
             all_results.extend(self._read_current_page(page, campaign))
             next_button = self._next_page(page)
             if next_button is None:
                 break
+            previous_marker = marker
             next_button.click(timeout=5000)
-            page.wait_for_timeout(700)
-        return all_results
+            for _ in range(20):
+                page.wait_for_timeout(300)
+                current_marker = page.url + "|" + str(
+                    page.locator("table tbody tr").first.inner_text(timeout=2500)
+                    if page.locator("table tbody tr").count()
+                    else ""
+                )
+                if current_marker != previous_marker:
+                    break
+        return all_results, pages_checked
 
     def _run(self, brand: str, campaigns: list[dict[str, str]]) -> None:
         playwright = None
         browser = None
         results: list[dict[str, Any]] = []
+        successful_campaigns: list[dict[str, Any]] = []
+        pages_checked = 0
         errors: list[str] = []
         terminal_error: Exception | None = None
         try:
@@ -501,11 +543,17 @@ class BrandConnectProposalManager:
                     ),
                 )
                 try:
-                    campaign_results = self._read_campaign(page, campaign)
+                    campaign_results, campaign_pages = self._read_campaign(
+                        page,
+                        campaign,
+                    )
                     results.extend(campaign_results)
+                    successful_campaigns.append(dict(campaign))
+                    pages_checked += campaign_pages
                     self._set(
                         processed_campaigns=index,
                         creators_seen=len(results),
+                        pages_checked=pages_checked,
                     )
                 except Exception as exc:
                     message = f"{campaign['product_label']}: {exc}"
@@ -522,7 +570,15 @@ class BrandConnectProposalManager:
                 message="크리에이터를 시트와 매칭해 상태와 콘텐츠 링크를 저장합니다.",
                 current_campaign="",
             )
-            saved = self.persist_callback(brand, results) if results else {}
+            saved = (
+                self.persist_callback(
+                    brand,
+                    results,
+                    successful_campaigns if not errors else [],
+                )
+                if results
+                else {}
+            )
             unmatched_names = list(saved.get("unmatched_names") or [])
             if unmatched_names:
                 errors.append(
@@ -531,6 +587,9 @@ class BrandConnectProposalManager:
             self._set(
                 matched=int(saved.get("matched", 0)),
                 updated=int(saved.get("updated", 0)),
+                dated=int(saved.get("dated", 0)),
+                reconciled=int(saved.get("reconciled", 0)),
+                summary_rows=int(saved.get("summary_rows", 0)),
                 links=int(saved.get("links", 0)),
                 unmatched=int(saved.get("unmatched", 0)),
             )

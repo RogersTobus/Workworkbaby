@@ -2,7 +2,10 @@ import unittest
 
 from openpyxl import Workbook
 
-from brand_connect_proposal import normalize_campaign_status
+from brand_connect_proposal import (
+    normalize_campaign_status,
+    normalize_proposal_date,
+)
 from brand_connect_sheet import (
     find_favorite_date_column,
     is_favorite_candidate,
@@ -102,6 +105,26 @@ class BrandConnectProposalDateTest(unittest.TestCase):
             1,
         )
 
+    def test_gaia_uses_product_specific_proposal_date_columns(self):
+        headers = {
+            "제안날짜(오일)": 6,
+            "제안날짜(병절임)": 8,
+            "제안날짜(파우치)": 10,
+        }
+
+        self.assertEqual(
+            find_favorite_date_column(headers, "gaia", "oil"),
+            6,
+        )
+        self.assertEqual(
+            find_favorite_date_column(headers, "gaia", "pickles"),
+            8,
+        )
+        self.assertEqual(
+            find_favorite_date_column(headers, "gaia", "pouch"),
+            10,
+        )
+
     def test_recognizes_only_proposal_status_values(self):
         self.sheet.append(["", "creator", "대기", "", ""])
         self.sheet.append(["", "creator2", "찜", "", ""])
@@ -112,6 +135,15 @@ class BrandConnectProposalDateTest(unittest.TestCase):
     def test_progress_status_is_accepted(self):
         self.assertEqual(normalize_campaign_status("진행 중"), "수락")
         self.assertEqual(normalize_campaign_status("진행중"), "수락")
+
+    def test_proposal_date_is_normalized(self):
+        self.assertEqual(normalize_proposal_date("2026-07-30"), "2026.07.30")
+        self.assertEqual(normalize_proposal_date("2026.07.30"), "2026.07.30")
+
+    def test_invalid_proposal_date_is_rejected(self):
+        with self.assertRaises(ValueError):
+            normalize_proposal_date("2026.07.40")
+
 
 
 if __name__ == "__main__":
