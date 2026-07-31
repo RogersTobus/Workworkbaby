@@ -58,6 +58,7 @@ MEMOS_HTML_PATH = APP_DIR / "memos.html"
 SALES_EMAIL_HTML_PATH = APP_DIR / "sales_email.html"
 BRAND_CONNECTING_HTML_PATH = APP_DIR / "brand_connecting.html"
 THEME_CSS_PATH = APP_DIR / "theme_meeting.css"
+GLASS_THEME_CSS_PATH = APP_DIR / "glass_theme.css"
 BRAND_CONNECT_CAMPAIGNS_PATH = (
     APP_DIR / "app_data" / "brand_connect_campaigns.json"
 )
@@ -3675,6 +3676,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_html(SALES_EMAIL_HTML_PATH)
             elif path == "/theme-meeting.css":
                 self.send_css(THEME_CSS_PATH)
+            elif path == "/glass-theme.css":
+                self.send_css(GLASS_THEME_CSS_PATH)
             elif path == "/brand-connecting":
                 self.send_html(BRAND_CONNECTING_HTML_PATH)
             elif path == "/api/dashboard":

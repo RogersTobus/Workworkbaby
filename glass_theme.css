@@ -1,0 +1,248 @@
+:root {
+  --glass-surface: rgba(255, 255, 255, .68);
+  --glass-surface-strong: rgba(255, 255, 255, .84);
+  --glass-surface-soft: rgba(244, 247, 255, .52);
+  --glass-line: rgba(255, 255, 255, .78);
+  --glass-line-blue: rgba(145, 170, 238, .30);
+  --glass-shadow: 0 22px 58px rgba(39, 55, 99, .13), inset 0 1px 0 rgba(255, 255, 255, .88);
+  --glass-shadow-soft: 0 12px 30px rgba(39, 55, 99, .09), inset 0 1px 0 rgba(255, 255, 255, .74);
+}
+
+html {
+  min-height: 100%;
+  background: #edf2ff;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 8% 2%, rgba(157, 185, 255, .48), transparent 30rem),
+    radial-gradient(circle at 94% 12%, rgba(200, 184, 255, .34), transparent 32rem),
+    radial-gradient(circle at 54% 96%, rgba(170, 232, 221, .30), transparent 36rem),
+    linear-gradient(145deg, #f4f7ff 0%, #e9effb 48%, #f4f2fb 100%) !important;
+  background-attachment: fixed !important;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  width: 290px;
+  height: 290px;
+  border-radius: 50%;
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+body::before {
+  top: 14%;
+  left: -120px;
+  background: rgba(123, 158, 245, .20);
+}
+
+body::after {
+  right: -110px;
+  bottom: 4%;
+  background: rgba(162, 133, 228, .16);
+}
+
+header,
+.top {
+  position: relative;
+}
+
+.nav,
+.master-nav,
+nav {
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px !important;
+  border: 1px solid rgba(255, 255, 255, .66);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .40);
+  box-shadow: 0 10px 26px rgba(52, 68, 107, .07), inset 0 1px 0 rgba(255, 255, 255, .85);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+  backdrop-filter: blur(18px) saturate(135%);
+}
+
+.nav a,
+.master-nav a,
+nav a {
+  border-radius: 11px !important;
+}
+
+.nav a:hover,
+.master-nav a:hover,
+nav a:hover {
+  background: rgba(255, 255, 255, .70) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+
+.nav a.active,
+.master-nav a.active,
+nav a.active {
+  background: linear-gradient(135deg, rgba(28, 43, 76, .96), rgba(50, 76, 139, .92)) !important;
+  border-color: rgba(255, 255, 255, .28) !important;
+  box-shadow: 0 9px 20px rgba(25, 39, 75, .20), inset 0 1px 0 rgba(255, 255, 255, .20) !important;
+}
+
+.card,
+.page-brand .workspace,
+.page-calendar .calendar-shell,
+.page-calendar .routine-shell,
+.page-calendar .board-shell,
+.page-meetings .note-list-shell,
+.page-meetings .editor-shell {
+  background: var(--glass-surface) !important;
+  border: 1px solid var(--glass-line) !important;
+  box-shadow: var(--glass-shadow) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  backdrop-filter: blur(24px) saturate(135%);
+}
+
+.page-brand .workspace-head,
+.page-sales .composer-head,
+.page-calendar .toolbar,
+.page-meetings .list-head {
+  background: rgba(255, 255, 255, .34) !important;
+  border-color: rgba(184, 197, 225, .34) !important;
+}
+
+input,
+select,
+textarea,
+.field input,
+.field select,
+.campaign-row input,
+.campaign-row select {
+  background: rgba(255, 255, 255, .56) !important;
+  border-color: rgba(159, 177, 213, .42) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .76);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.field input:focus,
+.field select:focus,
+.campaign-row input:focus,
+.campaign-row select:focus {
+  background: rgba(255, 255, 255, .82) !important;
+  border-color: rgba(83, 119, 221, .66) !important;
+  box-shadow: 0 0 0 4px rgba(54, 94, 220, .11), inset 0 1px 0 #fff !important;
+}
+
+.rule,
+.kpi,
+.meta div,
+.account-box,
+.filter-summary,
+.status-card,
+.status-meta div,
+.current,
+.reference-card,
+.history-item,
+.fixed-cc,
+.page-calendar .event-strip,
+.page-calendar .event-day-column,
+.page-meetings .ai-panel,
+.page-meetings .recorder {
+  background: var(--glass-surface-soft) !important;
+  border-color: rgba(255, 255, 255, .64) !important;
+  box-shadow: var(--glass-shadow-soft);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+  backdrop-filter: blur(16px) saturate(125%);
+}
+
+.primary,
+.start-button,
+.favorite-start,
+.proposal-start,
+.new-button,
+.ai-button,
+.reference-card button,
+.brand-switch button.active,
+.page-calendar .routine-add,
+.page-meetings .save-button {
+  background: linear-gradient(135deg, #3e68e7, #6b74e8) !important;
+  border-color: rgba(255, 255, 255, .24) !important;
+  box-shadow: 0 11px 23px rgba(54, 94, 220, .23), inset 0 1px 0 rgba(255, 255, 255, .24) !important;
+}
+
+button:not(:disabled),
+.btn:not(:disabled),
+a {
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease, border-color .16s ease;
+}
+
+.page-calendar .day {
+  background: rgba(255, 255, 255, .65);
+}
+
+.page-calendar .day.outside {
+  background: rgba(242, 245, 251, .48);
+}
+
+.page-calendar .day.has-meeting {
+  background: rgba(231, 249, 221, .76);
+}
+
+.page-calendar .day.has-event {
+  background: rgba(255, 247, 221, .76);
+}
+
+.page-calendar .day.has-meeting.has-event {
+  background: linear-gradient(135deg, rgba(231, 249, 221, .78) 0 50%, rgba(255, 247, 221, .78) 50% 100%);
+}
+
+.page-calendar .task,
+.page-calendar .routine-card,
+.page-calendar .board-card,
+.page-calendar .event-strip-item,
+.page-meetings .note-item.active,
+.page-meetings .recording-item {
+  border-color: rgba(255, 255, 255, .68) !important;
+  box-shadow: 0 7px 18px rgba(50, 66, 105, .07), inset 0 1px 0 rgba(255, 255, 255, .72);
+}
+
+.page-calendar .board-column {
+  border: 1px solid rgba(255, 255, 255, .54);
+  background: rgba(255, 255, 255, .32) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.page-calendar dialog,
+.page-meetings dialog {
+  background: rgba(255, 255, 255, .84);
+  border: 1px solid rgba(255, 255, 255, .88);
+  box-shadow: 0 32px 90px rgba(22, 34, 70, .28), inset 0 1px 0 #fff;
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  backdrop-filter: blur(28px) saturate(140%);
+}
+
+.toast {
+  background: rgba(23, 35, 59, .86) !important;
+  border: 1px solid rgba(255, 255, 255, .18);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+@media (max-width: 900px) {
+  .nav,
+  .master-nav,
+  nav {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}
