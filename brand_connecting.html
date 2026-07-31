@@ -299,7 +299,7 @@
     function updateFavoriteSummary(){
       const product=document.getElementById("favoriteProduct").selectedOptions[0]?.textContent||"";
       const count=document.getElementById("favoriteCount").value;
-      document.getElementById("favoriteSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · ${product} · <strong>실행 직전 Google 시트 최신화</strong> · <strong>A열 제안날짜와 선택 상품 열이 모두 빈 사람</strong>부터 ${count}명 · 그룹 <strong>${todayGroupName()}</strong> · 완료 후 상품 열에 '대기', A열에 찜 날짜(yyyy.mm.dd) 표시`;
+      document.getElementById("favoriteSummary").innerHTML=`<strong>${brands[currentBrand].label}</strong> · ${product} · <strong>실행 직전 Google 시트 최신화</strong> · <strong>선택 상품의 제안날짜와 상품 열이 모두 빈 사람</strong>부터 ${count}명 · 그룹 <strong>${todayGroupName()}</strong> · 완료 후 상품 열에 '대기', 해당 제안날짜 열에 찜 날짜(yyyy.mm.dd) 표시`;
       document.getElementById("favoriteGroupNote").textContent=`사용할 찜 그룹: ${todayGroupName()} · 실행 중에도 다른 업무를 계속할 수 있습니다.`;
     }
     function updateProposalSummary(){

@@ -4,6 +4,7 @@ from openpyxl import Workbook
 
 from brand_connect_proposal import normalize_campaign_status
 from brand_connect_sheet import (
+    find_favorite_date_column,
     is_favorite_candidate,
     row_has_proposal_status,
     set_favorite_date_if_blank,
@@ -77,6 +78,29 @@ class BrandConnectProposalDateTest(unittest.TestCase):
         self.assertFalse(is_favorite_candidate("2026.07.31", ""))
         self.assertFalse(is_favorite_candidate("", "대기"))
         self.assertFalse(is_favorite_candidate("2026.07.31", "대기"))
+
+    def test_alp_uses_product_specific_proposal_date_columns(self):
+        headers = {
+            "제안날짜(이뮨)": 6,
+            "알프이뮨": 7,
+            "제안날짜(아이언드롭)": 8,
+            "알프아이언드롭": 9,
+        }
+
+        self.assertEqual(
+            find_favorite_date_column(headers, "alp", "immun"),
+            6,
+        )
+        self.assertEqual(
+            find_favorite_date_column(headers, "alp", "iron_drop"),
+            8,
+        )
+
+    def test_gaia_keeps_common_proposal_date_column(self):
+        self.assertEqual(
+            find_favorite_date_column({"제안날짜": 1}, "gaia", "oil"),
+            1,
+        )
 
     def test_recognizes_only_proposal_status_values(self):
         self.sheet.append(["", "creator", "대기", "", ""])

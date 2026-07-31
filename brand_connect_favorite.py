@@ -476,7 +476,7 @@ class BrandConnectFavoriteManager:
                 f"요청 {count}명 중 {len(completed)}명을 {group_name} 그룹에 추가했습니다."
             )
             requested_message += (
-                f" A열 찜 날짜 신규 {int(result.get('dated', 0) or 0)}명, "
+                f" 제안날짜 열 신규 {int(result.get('dated', 0) or 0)}명, "
                 f"기존 날짜 유지 {int(result.get('date_preserved', 0) or 0)}명."
             )
             if not drive_ok:

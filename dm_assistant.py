@@ -35,7 +35,11 @@ from brand_connect_proposal import (
     RUNNING_STATUSES as PROPOSAL_RUNNING_STATUSES,
     BrandConnectProposalManager,
 )
-from brand_connect_sheet import is_favorite_candidate, set_favorite_date_if_blank
+from brand_connect_sheet import (
+    find_favorite_date_column,
+    is_favorite_candidate,
+    set_favorite_date_if_blank,
+)
 from dm_templates import DM_MESSAGE_TEMPLATES
 from instagram_dm_sender import InstagramDMSenderManager
 from price_updater import PriceUpdateManager
@@ -2815,7 +2819,11 @@ def prepare_brand_connect_favorites(
                 if header:
                     headers.setdefault(header, column)
             creator_column = headers.get("크리에이터")
-            date_column = headers.get("제안날짜") or headers.get("제안일자")
+            date_column = find_favorite_date_column(
+                headers,
+                brand_key,
+                product,
+            )
             platform_column = headers.get("플랫폼")
             product_column = headers.get(product_label)
             if (
@@ -2825,7 +2833,7 @@ def prepare_brand_connect_favorites(
                 or not product_column
             ):
                 raise KeyError(
-                    f"'{source['sheet_name']}' 시트에서 제안날짜·크리에이터·"
+                    f"'{source['sheet_name']}' 시트에서 선택 상품의 제안날짜·크리에이터·"
                     f"플랫폼·{product_label} 열을 찾지 못했습니다."
                 )
             candidates = []
@@ -2878,11 +2886,15 @@ def save_brand_connect_favorites(
                 if header:
                     headers.setdefault(header, column)
             creator_column = headers.get("크리에이터")
-            date_column = headers.get("제안날짜") or headers.get("제안일자")
+            date_column = find_favorite_date_column(
+                headers,
+                brand_key,
+                product,
+            )
             product_column = headers.get(product_label)
             if not creator_column or not date_column or not product_column:
                 raise KeyError(
-                    f"'{source['sheet_name']}' 시트에서 제안날짜·크리에이터·"
+                    f"'{source['sheet_name']}' 시트에서 선택 상품의 제안날짜·크리에이터·"
                     f"{product_label} 열을 찾지 못했습니다."
                 )
             for item in completed:
