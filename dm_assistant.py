@@ -257,20 +257,24 @@ def get_work_log_report(week_friday: object, regenerate: bool = False) -> dict:
 
 def update_work_log_report(payload: dict) -> dict:
     action = str(payload.get("action", "save")).strip()
-    if action != "save":
+    if action not in {"save", "sync_calendar"}:
         raise ValueError("지원하지 않는 업무기록 작업입니다.")
     friday = parse_work_log_friday(payload.get("week_friday"))
     with CALENDAR_LOCK:
         calendar_tasks = load_calendar_tasks()
     generated = build_work_log_draft(calendar_tasks, friday)
-    partners = normalize_work_log_entries(payload.get("partners"), "partner")
-    raw_sales = payload.get("sales")
-    if not isinstance(raw_sales, dict):
-        raw_sales = {}
-    sales = {
-        brand: normalize_work_log_entries(raw_sales.get(brand), "platform")
-        for brand in ("gaia", "alp", "coffee", "general")
-    }
+    if action == "sync_calendar":
+        partners = generated["partners"]
+        sales = generated["sales"]
+    else:
+        partners = normalize_work_log_entries(payload.get("partners"), "partner")
+        raw_sales = payload.get("sales")
+        if not isinstance(raw_sales, dict):
+            raw_sales = {}
+        sales = {
+            brand: normalize_work_log_entries(raw_sales.get(brand), "platform")
+            for brand in ("gaia", "alp", "coffee", "general")
+        }
     report = {
         **generated,
         "partners": partners,

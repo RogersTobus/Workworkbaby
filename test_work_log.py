@@ -99,6 +99,25 @@ class WorkLogDraftTests(unittest.TestCase):
         )
         self.assertEqual(text, "SSG 가이아 쓱특가 진행")
 
+    def test_future_calendar_plan_is_included_in_next_week(self):
+        draft = build_work_log_draft(
+            [
+                {
+                    "id": "future-1",
+                    "date": "2026-08-04",
+                    "text": "베네피아 명절행사 제안",
+                    "kind": "task",
+                    "status": "todo",
+                }
+            ],
+            date(2026, 7, 31),
+        )
+        partner = next(
+            item for item in draft["partners"] if item["partner"] == "베네피아"
+        )
+        self.assertEqual(partner["this_week"], "")
+        self.assertEqual(partner["next_week"], "베네피아 명절행사 제안")
+
 
 if __name__ == "__main__":
     unittest.main()
