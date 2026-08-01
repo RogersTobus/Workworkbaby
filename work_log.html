@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>업무기록 초안</title>
+  <style>
+    :root{--ink:#17233e;--muted:#71809d;--blue:#3961dc;--line:#d8e1f2;--soft:#f3f6fc;--danger:#bf5252}
+    *{box-sizing:border-box}body{margin:0;color:var(--ink);font-family:"Segoe UI","Malgun Gothic",sans-serif}button,input,textarea{font:inherit}button{cursor:pointer}
+    main{max-width:1480px;margin:0 auto;padding:34px 20px 60px}header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px}.eyebrow{color:var(--blue);font-size:12px;font-weight:900;letter-spacing:.13em}h1{margin:7px 0 0;font-size:36px;letter-spacing:-.04em}.safe{color:var(--muted);font-size:13px}.nav{display:flex;flex-wrap:wrap;gap:4px;margin:20px 0}.nav a{padding:12px 14px;color:#63708b;text-decoration:none;font-size:14px;font-weight:800}.nav a.active{color:#fff}
+    .control,.panel,.entry,.source-panel{border:1px solid var(--line);border-radius:22px;background:rgba(255,255,255,.78)}.control{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;margin-bottom:16px}.week-tools,.actions,.sheet-links,.brand-tabs{display:flex;align-items:center;flex-wrap:wrap;gap:8px}.week-tools input{height:42px;padding:0 12px;border:1px solid var(--line);border-radius:11px;font-weight:800}.ghost,.primary,.add{height:42px;padding:0 16px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink);font-weight:800}.primary{border-color:transparent;background:var(--blue);color:#fff}.primary:disabled{opacity:.6}.sheet-links a{padding:10px 13px;border:1px solid var(--line);border-radius:10px;color:#52627e;text-decoration:none;font-size:13px;font-weight:800}
+    .summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.metric{padding:18px;border:1px solid rgba(255,255,255,.8);border-radius:18px;background:rgba(255,255,255,.64)}.metric span{display:block;color:var(--muted);font-size:12px;font-weight:800}.metric strong{display:block;margin-top:5px;font-size:24px}.source-panel{padding:18px 20px;margin-bottom:18px}.source-head,.panel-head{display:flex;align-items:center;justify-content:space-between;gap:16px}.source-head h2,.panel-head h2{margin:0;font-size:20px}.source-head p,.panel-head p{margin:4px 0 0;color:var(--muted);font-size:12px}.source-list{display:flex;gap:7px;overflow:auto;padding-top:13px}.source-chip{flex:none;max-width:320px;padding:9px 11px;border-radius:10px;background:var(--soft);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.source-chip.done{color:#75809a;text-decoration:line-through}.source-chip.event{background:#f1eafd;color:#684d8f}
+    .panel{padding:20px;margin-top:18px}.panel-head{margin-bottom:15px}.entries{display:grid;gap:12px}.entry{display:grid;grid-template-columns:minmax(150px,.38fr) minmax(260px,1fr) minmax(260px,1fr) 40px;gap:10px;padding:13px}.entry label{display:grid;gap:7px;color:var(--muted);font-size:11px;font-weight:900}.entry input,.entry textarea{width:100%;border:1px solid var(--line);border-radius:11px;background:#fff;padding:11px;color:var(--ink)}.entry input{height:44px;font-weight:800}.entry textarea{min-height:132px;resize:vertical;line-height:1.55}.remove{align-self:start;width:40px;height:40px;border:1px solid #f0cccc;border-radius:10px;background:#fff1f1;color:var(--danger);font-weight:900}.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:14px}.brand-tabs{margin-bottom:13px}.brand-tab{height:38px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#61708c;font-weight:800}.brand-tab.active{border-color:var(--blue);background:#eaf0ff;color:#244fc9}.footer-actions{position:sticky;bottom:14px;display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:18px;padding:13px 16px;border:1px solid rgba(255,255,255,.8);border-radius:16px;background:rgba(248,250,255,.82);backdrop-filter:blur(16px)}#saveStatus{margin-right:auto;color:var(--muted);font-size:13px}.notice{padding:12px 14px;border-radius:12px;background:#eef3ff;color:#53627e;font-size:12px;line-height:1.6}
+    @media(max-width:900px){header,.control{align-items:stretch;flex-direction:column}.summary{grid-template-columns:repeat(2,1fr)}.entry{grid-template-columns:1fr}.remove{justify-self:end}.safe{text-align:left}}
+  </style>
+  <link rel="stylesheet" href="/glass-theme.css">
+</head>
+<body class="page-work-log">
+<main>
+  <header>
+    <div><div class="eyebrow">TOBUS · WEEKLY WORK LOG</div><h1>업무기록 초안</h1></div>
+    <div class="safe">업무 캘린더 기록을 주간 보고 양식에 맞게 정리합니다</div>
+  </header>
+  <nav class="nav" aria-label="업무 메뉴">
+    <a href="/brand-connecting">브랜드 커넥팅</a><a href="/">Instagram DM</a><a href="/prices">네이버 가격 최신화</a><a href="/simulation">시뮬레이션</a><a href="/calendar">업무 캘린더</a><a class="active" href="/work-log">업무기록</a><a href="/meetings">회의록</a><a href="/memos">메모</a><a href="/sales-email">영업메일</a>
+  </nav>
+
+  <section class="control">
+    <div class="week-tools">
+      <button id="prevWeek" class="ghost" type="button">← 이전 주</button>
+      <label>보고 금요일 <input id="weekFriday" type="date"></label>
+      <button id="nextWeek" class="ghost" type="button">다음 주 →</button>
+    </div>
+    <div class="actions">
+      <button id="regenerate" class="ghost" type="button">↻ 캘린더에서 다시 만들기</button>
+      <button id="saveTop" class="primary" type="button">초안 저장</button>
+    </div>
+  </section>
+
+  <section class="summary" aria-label="업무 요약">
+    <div class="metric"><span>이번 주 캘린더 기록</span><strong id="metricCurrent">0</strong></div>
+    <div class="metric"><span>완료 업무</span><strong id="metricDone">0</strong></div>
+    <div class="metric"><span>다음 주 등록 업무</span><strong id="metricNext">0</strong></div>
+    <div class="metric"><span>이월 후보</span><strong id="metricCarry">0</strong></div>
+  </section>
+
+  <section class="source-panel">
+    <div class="source-head"><div><h2>초안 근거</h2><p id="periodText"></p></div><span id="savedBadge" class="notice">새 초안</span></div>
+    <div id="sourceList" class="source-list"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>협력사별 주간 업무</h2><p>`주차_영준` 시트에 옮기기 위한 초안입니다.</p></div>
+      <div class="sheet-links"><a href="https://docs.google.com/spreadsheets/d/1A0prlF22nRNA1ZwwKb1zQ6kggvO6fr4OhhZxMBZC3S8/edit?gid=1954324459#gid=1954324459" target="_blank" rel="noopener">주차_영준 열기</a><button id="addPartner" class="add" type="button">+ 협력사 추가</button></div>
+    </div>
+    <div class="notice">자동 분류가 애매한 업무는 `기타`에 모입니다. 협력사명과 내용을 자유롭게 고쳐서 저장하세요.</div>
+    <div id="partnerEntries" class="entries" style="margin-top:12px"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>브랜드·플랫폼별 영업현황</h2><p>가이아·알프·이탈리안커피 영업현황 시트용 초안입니다.</p></div>
+      <div class="sheet-links"><a href="https://docs.google.com/spreadsheets/d/1jutw9GQkXuVZ2rlaTX_ZecaF0Mkkalrm/edit?gid=2113188038#gid=2113188038" target="_blank" rel="noopener">영업현황 열기</a><button id="addPlatform" class="add" type="button">+ 플랫폼 추가</button></div>
+    </div>
+    <div id="brandTabs" class="brand-tabs"></div>
+    <div id="salesEntries" class="entries"></div>
+  </section>
+
+  <div class="footer-actions"><span id="saveStatus">아직 저장하지 않았습니다.</span><button id="saveBottom" class="primary" type="button">초안 저장</button></div>
+</main>
+<script>
+  const $=id=>document.getElementById(id);
+  const brandOrder=["gaia","alp","coffee","general"];
+  let report=null,currentBrand="gaia",dirty=false;
+  async function request(url,options={}){const response=await fetch(url,options),data=await response.json();if(!response.ok)throw new Error(data.error||"처리하지 못했습니다.");return data}
+  function localDate(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`}
+  function defaultFriday(){const now=new Date(),day=now.getDay(),offset=day===6?-1:day===0?-2:5-day;now.setDate(now.getDate()+offset);return localDate(now)}
+  function moveWeek(amount){const value=new Date(`${$("weekFriday").value}T12:00:00`);value.setDate(value.getDate()+amount*7);$("weekFriday").value=localDate(value);loadReport(false)}
+  function setDirty(){dirty=true;$("saveStatus").textContent="수정 내용이 저장되지 않았습니다."}
+  function entryCard(item,nameKey,index,onRemove){
+    const card=document.createElement("div");card.className="entry";
+    const name=document.createElement("label");name.textContent=nameKey==="partner"?"협력사":"플랫폼";
+    const nameInput=document.createElement("input");nameInput.value=item[nameKey]||"";nameInput.addEventListener("input",()=>{item[nameKey]=nameInput.value;setDirty()});name.append(nameInput);
+    const current=document.createElement("label");current.textContent="이번 주에 한 일";const currentArea=document.createElement("textarea");currentArea.value=item.this_week||"";currentArea.placeholder="이번 주 진행사항을 적어주세요.";currentArea.addEventListener("input",()=>{item.this_week=currentArea.value;setDirty()});current.append(currentArea);
+    const next=document.createElement("label");next.textContent="다음 주 계획";const nextArea=document.createElement("textarea");nextArea.value=item.next_week||"";nextArea.placeholder="다음 주에 진행할 업무를 자유롭게 적어주세요.";nextArea.addEventListener("input",()=>{item.next_week=nextArea.value;setDirty()});next.append(nextArea);
+    const remove=document.createElement("button");remove.className="remove";remove.type="button";remove.textContent="×";remove.setAttribute("aria-label",`${index+1}번째 항목 삭제`);remove.addEventListener("click",onRemove);
+    card.append(name,current,next,remove);return card;
+  }
+  function renderPartners(){const box=$("partnerEntries");box.replaceChildren();if(!report.partners.length){box.innerHTML='<div class="empty">협력사별 초안이 없습니다. 협력사를 추가하거나 캘린더 업무를 확인해주세요.</div>';return}report.partners.forEach((item,index)=>box.append(entryCard(item,"partner",index,()=>{report.partners.splice(index,1);setDirty();renderPartners()})))}
+  function renderBrandTabs(){const box=$("brandTabs");box.replaceChildren();brandOrder.forEach(brand=>{const button=document.createElement("button");button.type="button";button.className=`brand-tab${brand===currentBrand?" active":""}`;button.textContent=report.brand_labels[brand];button.addEventListener("click",()=>{currentBrand=brand;renderBrandTabs();renderSales()});box.append(button)})}
+  function renderSales(){const box=$("salesEntries");box.replaceChildren();const entries=report.sales[currentBrand]||[];if(!entries.length){box.innerHTML='<div class="empty">이 브랜드에 자동 분류된 업무가 없습니다. 플랫폼을 추가해 직접 작성할 수 있습니다.</div>';return}entries.forEach((item,index)=>box.append(entryCard(item,"platform",index,()=>{entries.splice(index,1);setDirty();renderSales()})))}
+  function renderSources(){const box=$("sourceList");box.replaceChildren();const items=report.source_tasks||[];if(!items.length){box.innerHTML='<div class="empty">해당 주에 등록된 캘린더 업무가 없습니다.</div>';return}items.forEach(item=>{const chip=document.createElement("span");chip.className=`source-chip ${item.status==="done"?"done":""} ${item.kind==="event"?"event":""}`;chip.title=item.text;chip.textContent=`${item.date.slice(5)} · ${item.text}`;box.append(chip)})}
+  function render(){const summary=report.summary||{};$("metricCurrent").textContent=summary.this_week||0;$("metricDone").textContent=summary.completed||0;$("metricNext").textContent=summary.next_week||0;$("metricCarry").textContent=summary.carry_over||0;$("periodText").textContent=`이번 주 ${report.period_start} ~ ${report.period_end} · 다음 주 ${report.next_period_start} ~ ${report.next_period_end}`;$("savedBadge").textContent=report.saved?(report.updated_at?`저장됨 · ${report.updated_at.replace("T"," ")}`:"저장된 초안"):"캘린더 기반 새 초안";renderSources();renderPartners();renderBrandTabs();renderSales();dirty=false;$("saveStatus").textContent=report.saved?"저장된 초안을 불러왔습니다.":"캘린더 기반 초안입니다. 내용을 확인하고 저장하세요."}
+  async function loadReport(regenerate){if(dirty&&!regenerate&&!confirm("저장하지 않은 수정 내용이 있습니다. 다른 주를 불러올까요?"))return;const buttons=[$("regenerate"),$("saveTop"),$("saveBottom")];buttons.forEach(button=>button.disabled=true);$("saveStatus").textContent="캘린더 기록을 정리하고 있습니다…";try{report=await request(`/api/work-log?week=${encodeURIComponent($("weekFriday").value)}&regenerate=${regenerate?1:0}`);render()}catch(error){$("saveStatus").textContent=error.message}finally{buttons.forEach(button=>button.disabled=false)}}
+  async function save(){if(!report)return;const buttons=[$("saveTop"),$("saveBottom")];buttons.forEach(button=>button.disabled=true);$("saveStatus").textContent="초안을 저장하고 있습니다…";try{report=await request("/api/work-log",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"save",week_friday:report.week_friday,partners:report.partners,sales:report.sales})});render()}catch(error){$("saveStatus").textContent=error.message}finally{buttons.forEach(button=>button.disabled=false)}}
+  $("prevWeek").addEventListener("click",()=>moveWeek(-1));$("nextWeek").addEventListener("click",()=>moveWeek(1));$("weekFriday").addEventListener("change",()=>loadReport(false));$("regenerate").addEventListener("click",()=>{if(!dirty||confirm("현재 수정 내용을 버리고 캘린더에서 다시 만들까요?"))loadReport(true)});$("saveTop").addEventListener("click",save);$("saveBottom").addEventListener("click",save);
+  $("addPartner").addEventListener("click",()=>{report.partners.push({id:`partner-${Date.now()}`,partner:"새 협력사",this_week:"",next_week:""});setDirty();renderPartners()});$("addPlatform").addEventListener("click",()=>{report.sales[currentBrand].push({id:`${currentBrand}-${Date.now()}`,platform:"새 플랫폼",this_week:"",next_week:""});setDirty();renderSales()});
+  window.addEventListener("beforeunload",event=>{if(dirty){event.preventDefault();event.returnValue=""}});$("weekFriday").value=defaultFriday();loadReport(false);
+</script>
+</body>
+</html>

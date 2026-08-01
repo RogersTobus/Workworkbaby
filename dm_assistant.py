@@ -50,6 +50,7 @@ from dm_templates import DM_MESSAGE_TEMPLATES
 from instagram_dm_sender import InstagramDMSenderManager
 from price_updater import PriceUpdateManager
 from simulation_manager import SimulationManager
+from work_log import build_work_log_draft, latest_or_upcoming_friday
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -62,6 +63,7 @@ MEETINGS_HTML_PATH = APP_DIR / "meetings.html"
 MEMOS_HTML_PATH = APP_DIR / "memos.html"
 SALES_EMAIL_HTML_PATH = APP_DIR / "sales_email.html"
 BRAND_CONNECTING_HTML_PATH = APP_DIR / "brand_connecting.html"
+WORK_LOG_HTML_PATH = APP_DIR / "work_log.html"
 THEME_CSS_PATH = APP_DIR / "theme_meeting.css"
 GLASS_THEME_CSS_PATH = APP_DIR / "glass_theme.css"
 BRAND_CONNECT_CAMPAIGNS_PATH = (
@@ -88,6 +90,7 @@ CALENDAR_TASKS_PATH = APP_DIR / "calendar_tasks.json"
 MEETING_NOTES_PATH = APP_DIR / "meeting_notes.json"
 PLATFORM_MEMOS_PATH = APP_DIR / "platform_memos.json"
 SALES_EMAIL_DATA_PATH = APP_DIR / "sales_email_data.json"
+WORK_LOG_DRAFTS_PATH = APP_DIR / "work_log_drafts.json"
 SALES_EMAIL_ATTACHMENTS_DIR = APP_DIR / "sales_email_attachments"
 DM_REFERENCE_IMAGE_DIR = APP_DIR / "sales_email_assets"
 DM_REFERENCE_IMAGES = {
@@ -137,6 +140,7 @@ CALENDAR_SYNC_LOCK = threading.Lock()
 MEETING_NOTES_LOCK = threading.Lock()
 PLATFORM_MEMOS_LOCK = threading.Lock()
 SALES_EMAIL_LOCK = threading.Lock()
+WORK_LOG_LOCK = threading.Lock()
 MEETING_AI_LOCK = threading.Lock()
 MEETING_AI_JOBS_LOCK = threading.Lock()
 MEETING_AI_JOBS: dict[str, dict] = {}
@@ -179,6 +183,105 @@ def save_calendar_tasks(tasks: list[dict]) -> None:
         encoding="utf-8",
     )
     temporary.replace(CALENDAR_TASKS_PATH)
+
+
+def load_work_log_drafts() -> dict:
+    if not WORK_LOG_DRAFTS_PATH.exists():
+        return {}
+    try:
+        data = json.loads(WORK_LOG_DRAFTS_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_work_log_drafts(drafts: dict) -> None:
+    temporary = WORK_LOG_DRAFTS_PATH.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(drafts, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    temporary.replace(WORK_LOG_DRAFTS_PATH)
+
+
+def normalize_work_log_entries(value: object, name_key: str) -> list[dict]:
+    if not isinstance(value, list):
+        return []
+    entries = []
+    for index, item in enumerate(value[:100], 1):
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get(name_key, "")).strip()[:100]
+        this_week = str(item.get("this_week", "")).strip()[:10000]
+        next_week = str(item.get("next_week", "")).strip()[:10000]
+        if not name and not this_week and not next_week:
+            continue
+        entries.append(
+            {
+                "id": str(item.get("id", "")).strip() or f"{name_key}-{index}",
+                name_key: name or "기타",
+                "this_week": this_week,
+                "next_week": next_week,
+            }
+        )
+    return entries
+
+
+def parse_work_log_friday(value: object) -> date:
+    text = str(value or "").strip()
+    if not text:
+        return latest_or_upcoming_friday(date.today())
+    try:
+        selected = date.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError("업무기록 기준일이 올바르지 않습니다.") from exc
+    if selected.weekday() != 4:
+        raise ValueError("업무기록 기준일은 금요일을 선택해주세요.")
+    return selected
+
+
+def get_work_log_report(week_friday: object, regenerate: bool = False) -> dict:
+    friday = parse_work_log_friday(week_friday)
+    key = friday.isoformat()
+    with WORK_LOG_LOCK:
+        drafts = load_work_log_drafts()
+        saved = drafts.get(key)
+    if isinstance(saved, dict) and not regenerate:
+        return {**saved, "saved": True}
+    with CALENDAR_LOCK:
+        tasks = load_calendar_tasks()
+    report = build_work_log_draft(tasks, friday)
+    report.update(saved=False, updated_at=None)
+    return report
+
+
+def update_work_log_report(payload: dict) -> dict:
+    action = str(payload.get("action", "save")).strip()
+    if action != "save":
+        raise ValueError("지원하지 않는 업무기록 작업입니다.")
+    friday = parse_work_log_friday(payload.get("week_friday"))
+    with CALENDAR_LOCK:
+        calendar_tasks = load_calendar_tasks()
+    generated = build_work_log_draft(calendar_tasks, friday)
+    partners = normalize_work_log_entries(payload.get("partners"), "partner")
+    raw_sales = payload.get("sales")
+    if not isinstance(raw_sales, dict):
+        raw_sales = {}
+    sales = {
+        brand: normalize_work_log_entries(raw_sales.get(brand), "platform")
+        for brand in ("gaia", "alp", "coffee", "general")
+    }
+    report = {
+        **generated,
+        "partners": partners,
+        "sales": sales,
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    with WORK_LOG_LOCK:
+        drafts = load_work_log_drafts()
+        drafts[friday.isoformat()] = report
+        save_work_log_drafts(drafts)
+    return {**report, "saved": True, "ok": True}
 
 
 def load_meeting_notes() -> list[dict]:
@@ -3862,6 +3965,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_html(SIMULATION_HTML_PATH)
             elif path == "/calendar":
                 self.send_html(CALENDAR_HTML_PATH)
+            elif path == "/work-log":
+                self.send_html(WORK_LOG_HTML_PATH)
             elif path == "/meetings":
                 self.send_html(MEETINGS_HTML_PATH)
             elif path == "/memos":
@@ -3902,6 +4007,14 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json(get_calendar_checklist_routines())
             elif path == "/api/calendar/sync/status":
                 self.send_json(dict(CALENDAR_SYNC_STATUS))
+            elif path == "/api/work-log":
+                query = parse_qs(parsed.query)
+                self.send_json(
+                    get_work_log_report(
+                        query.get("week", [""])[0],
+                        query.get("regenerate", ["0"])[0] == "1",
+                    )
+                )
             elif path == "/api/meetings":
                 self.send_json(get_meeting_notes())
             elif path == "/api/memos":
@@ -4131,6 +4244,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json(update_calendar_checklist_routine(payload))
             elif path == "/api/calendar/sync":
                 self.send_json(sync_calendar_events())
+            elif path == "/api/work-log":
+                self.send_json(update_work_log_report(payload))
             elif path == "/api/meetings":
                 self.send_json(update_meeting_note(payload))
             elif path == "/api/memos":
