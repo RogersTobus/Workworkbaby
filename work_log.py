@@ -175,20 +175,30 @@ def classify_brands(text: str) -> list[str]:
     return matched or ["general"]
 
 
+def _sheet_style_text(item: dict[str, str]) -> str:
+    text = re.sub(r"\s+", " ", item["text"]).strip()
+    text = re.sub(r"^[-•]\s*", "", text)
+    text = re.sub(r"^\[(?:완료|진행 중|검토 중|예정)\]\s*", "", text)
+    if item.get("kind") == "event":
+        text = re.sub(r"\s*·\s*", " ", text)
+        if not text.endswith(("진행", "확정", "준비")):
+            text = f"{text} 진행"
+    return text
+
+
 def _lines(items: list[dict[str, str]], next_week: bool = False) -> str:
     seen: set[str] = set()
-    output = []
+    output: list[str] = []
     for item in items:
-        text = re.sub(r"\s+", " ", item["text"]).strip()
+        text = _sheet_style_text(item)
         key = text.casefold()
         if not text or key in seen:
             continue
         seen.add(key)
-        if next_week:
-            output.append(f"- {text}")
-        else:
-            output.append(f"- [{STATUS_LABELS.get(item['status'], '예정')}] {text}")
-    return "\n".join(output)
+        output.append(text)
+    if len(output) <= 1:
+        return "" if not output else output[0]
+    return "\n".join(f"{index}) {text}" for index, text in enumerate(output, 1))
 
 
 def build_work_log_draft(

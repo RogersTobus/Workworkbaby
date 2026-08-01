@@ -51,6 +51,54 @@ class WorkLogDraftTests(unittest.TestCase):
         self.assertIn("알프 롯데아이몰 행사 제안", alp["next_week"])
         self.assertEqual(draft["summary"]["carry_over"], 1)
 
+    def test_draft_uses_existing_sheet_tone_without_status_labels(self):
+        draft = build_work_log_draft(
+            [
+                {
+                    "id": "1",
+                    "date": "2026-07-27",
+                    "text": "G마켓 가격 수정",
+                    "kind": "task",
+                    "status": "done",
+                },
+                {
+                    "id": "2",
+                    "date": "2026-07-28",
+                    "text": "G마켓 행사 전 확인",
+                    "kind": "task",
+                    "status": "done",
+                },
+            ],
+            date(2026, 7, 31),
+        )
+        text = next(
+            item["this_week"]
+            for item in draft["partners"]
+            if item["partner"] == "G마켓/옥션"
+        )
+        self.assertEqual(text, "1) G마켓 가격 수정\n2) G마켓 행사 전 확인")
+        self.assertNotIn("[완료]", text)
+
+    def test_event_is_written_as_progress_in_sheet_tone(self):
+        draft = build_work_log_draft(
+            [
+                {
+                    "id": "event-1",
+                    "date": "2026-07-27",
+                    "end_date": "2026-07-28",
+                    "text": "SSG_가이아_쓱특가",
+                    "kind": "event",
+                }
+            ],
+            date(2026, 7, 31),
+        )
+        text = next(
+            item["this_week"]
+            for item in draft["partners"]
+            if item["partner"] == "SSG"
+        )
+        self.assertEqual(text, "SSG 가이아 쓱특가 진행")
+
 
 if __name__ == "__main__":
     unittest.main()
