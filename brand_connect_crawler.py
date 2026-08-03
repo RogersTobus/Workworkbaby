@@ -357,6 +357,7 @@ class BrandConnectCrawlerManager:
         target: int,
         known: set[str],
         collected: list[dict[str, Any]],
+        collected_offset: int = 0,
     ) -> int:
         self._select_filters(page, brand, platform)
         duplicates = 0
@@ -386,6 +387,11 @@ class BrandConnectCrawlerManager:
                     if card_key in seen_cards:
                         continue
                     seen_cards.add(card_key)
+                    # Seeing a new card is forward progress even when that
+                    # creator already exists in the sheet. Keep scrolling
+                    # through long duplicate runs until the requested number
+                    # of genuinely new rows is found.
+                    progress = True
                     card_text = self._open_detail_from_button(button)
                     detail_text = self._detail_text(page)
                     if not detail_text:
@@ -408,7 +414,7 @@ class BrandConnectCrawlerManager:
                     known.add(creator_key)
                     collected.append(candidate)
                     self._set(
-                        collected=len(collected),
+                        collected=collected_offset + len(collected),
                         duplicates=self.snapshot()["duplicates"] + duplicates,
                         message=f"{candidate['creator']} 정보 수집 완료",
                     )
@@ -428,7 +434,10 @@ class BrandConnectCrawlerManager:
                 stalled_rounds = 0
             else:
                 stalled_rounds += 1
-            if stalled_rounds >= 4:
+            # Duplicate-heavy sheets can require many scrolls before the next
+            # genuinely new creator appears. Four empty rounds stopped a
+            # 100-person request far too early.
+            if stalled_rounds >= 20:
                 break
             page.mouse.wheel(0, 1600)
             page.wait_for_timeout(900)
@@ -475,55 +484,103 @@ class BrandConnectCrawlerManager:
             self._close_detail(page)
 
             self._set(status="running", message="크리에이터 검색 조건을 설정합니다.")
-            collected: list[dict[str, Any]] = []
             known = set(existing)
-            remaining_platforms = len(platforms)
-            for platform in platforms:
-                if self.stop_event.is_set() or len(collected) >= count:
+            total_collected = 0
+            total_added = 0
+            drive_ok = True
+            last_result: dict[str, Any] = {}
+
+            # The requested count means rows actually added to the sheet, not
+            # profiles merely opened in Brand Connect. If a save rejects a
+            # late duplicate, keep crawling for a replacement.
+            while total_added < count and not self.stop_event.is_set():
+                collected: list[dict[str, Any]] = []
+                remaining_platforms = len(platforms)
+                for platform in platforms:
+                    if self.stop_event.is_set():
+                        break
+                    remaining = count - total_added - len(collected)
+                    if remaining <= 0:
+                        break
+                    platform_goal = len(collected) + math.ceil(
+                        remaining / remaining_platforms
+                    )
+                    leftovers = self._crawl_platform(
+                        page,
+                        brand,
+                        platform,
+                        platform_goal,
+                        known,
+                        collected,
+                        collected_offset=total_collected,
+                    )
+                    if leftovers:
+                        self._set(
+                            duplicates=self.snapshot()["duplicates"] + leftovers
+                        )
+                    remaining_platforms -= 1
+
+                if self.stop_event.is_set() or not collected:
                     break
-                remaining = count - len(collected)
-                platform_goal = len(collected) + math.ceil(
-                    remaining / remaining_platforms
+
+                total_collected += len(collected)
+                self._set(
+                    status="saving",
+                    collected=total_collected,
+                    message=(
+                        f"신규 후보 {len(collected)}명을 시트에 저장합니다. "
+                        f"목표 {count}명 중 {total_added}명 추가 완료"
+                    ),
                 )
-                leftovers = self._crawl_platform(
-                    page,
-                    brand,
-                    platform,
-                    platform_goal,
-                    known,
-                    collected,
+                last_result = self.persist_callback(brand, collected)
+                drive = dict(last_result.get("drive") or {})
+                drive_ok = drive.get("status") in {"completed", "skipped"}
+                newly_added = int(last_result.get("added", 0) or 0)
+                total_added += newly_added
+                self._set(
+                    status="running" if drive_ok else "completed_with_warning",
+                    added=total_added,
+                    duplicates=self.snapshot()["duplicates"]
+                    + int(last_result.get("duplicates", 0) or 0),
+                    message=(
+                        f"시트에 {total_added}/{count}명 추가 완료. "
+                        "목표 인원을 채울 때까지 다음 후보를 찾습니다."
+                    ),
                 )
-                if leftovers:
-                    self._set(duplicates=self.snapshot()["duplicates"] + leftovers)
-                remaining_platforms -= 1
+                if not drive_ok or newly_added == 0:
+                    break
 
             if self.stop_event.is_set():
                 self._set(
                     status="stopped",
-                    message="크롤링을 중단했습니다. 시트에는 추가하지 않았습니다.",
+                    message=(
+                        "크롤링을 중단했습니다. "
+                        f"지금까지 시트에 추가한 {total_added}명은 유지됩니다."
+                    ),
+                    added=total_added,
                     finished_at=datetime.now().isoformat(timespec="seconds"),
                 )
                 return
-            self._set(status="saving", message="중복을 제외한 새 명단을 시트에 저장합니다.")
-            result = self.persist_callback(brand, collected)
-            drive = dict(result.get("drive") or {})
-            drive_ok = drive.get("status") in {"completed", "skipped"}
-            if drive_ok:
-                message = (
-                    f"새 크리에이터 {result.get('added', 0)}명을 "
-                    f"{result.get('sheet_name', '')} 시트에 추가했습니다."
+            if total_added >= count and drive_ok:
+                message = f"요청한 신규 인원 {count}명을 시트에 모두 추가했습니다."
+                final_status = "completed"
+            elif not drive_ok:
+                drive = dict(last_result.get("drive") or {})
+                message = drive.get(
+                    "message",
+                    f"시트에는 {total_added}명을 추가했지만 Drive 최신화를 확인해야 합니다.",
                 )
+                final_status = "completed_with_warning"
             else:
                 message = (
-                    f"로컬에 {result.get('added', 0)}명을 저장했습니다. "
-                    f"{drive.get('message', 'Drive 최신화 확인이 필요합니다.')}"
+                    "검색 가능한 신규 인원을 모두 확인했습니다. "
+                    f"목표 {count}명 중 {total_added}명을 시트에 추가했습니다."
                 )
+                final_status = "completed_with_warning"
             self._set(
-                status="completed" if drive_ok else "completed_with_warning",
+                status=final_status,
                 message=message,
-                added=result.get("added", 0),
-                duplicates=self.snapshot()["duplicates"]
-                + result.get("duplicates", 0),
+                added=total_added,
                 finished_at=datetime.now().isoformat(timespec="seconds"),
                 current_creator="",
             )

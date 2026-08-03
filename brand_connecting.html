@@ -453,14 +453,14 @@
       const visibleStatus=status.brand&&status.brand!==currentBrand
         ? {status:"idle",message:"크롤링 대기 중",requested:0,collected:0,added:0,duplicates:0}
         : status;
-      const requested=Number(visibleStatus.requested||0),collected=Number(visibleStatus.collected||0);
+      const requested=Number(visibleStatus.requested||0),collected=Number(visibleStatus.collected||0),added=Number(visibleStatus.added||0);
       crawlIsRunning=running;
       document.getElementById("statusMessage").textContent=visibleStatus.message||"크롤링 대기 중";
       document.getElementById("statusBadge").textContent={idle:"대기",queued:"준비",preparing:"원본 확인",running:"진행 중",saving:"저장 중",login_required:"로그인 필요",completed:"완료",completed_with_warning:"확인 필요",failed:"실패",stopped:"중단"}[visibleStatus.status]||visibleStatus.status;
       document.getElementById("collectedCount").textContent=`${collected.toLocaleString()}명`;
-      document.getElementById("addedCount").textContent=`${Number(visibleStatus.added||0).toLocaleString()}명`;
+      document.getElementById("addedCount").textContent=`${added.toLocaleString()}명`;
       document.getElementById("duplicateCount").textContent=`${Number(visibleStatus.duplicates||0).toLocaleString()}명`;
-      document.getElementById("crawlProgress").style.width=`${requested?Math.min(100,collected/requested*100):0}%`;
+      document.getElementById("crawlProgress").style.width=`${requested?Math.min(100,added/requested*100):0}%`;
       document.getElementById("resumeCrawl").hidden=visibleStatus.status!=="login_required";
       updateControls();
       clearTimeout(pollTimer);
