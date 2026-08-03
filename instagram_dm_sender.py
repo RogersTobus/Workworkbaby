@@ -206,14 +206,60 @@ class InstagramDMSenderManager:
     def _account_visible(page: Any, expected_account: str) -> bool:
         username = expected_account.lstrip("@")
         try:
+            current_url = str(page.url or "").casefold()
+            if "/accounts/onetap" in current_url or "/accounts/login" in current_url:
+                return False
             if page.locator(f'a[href="/{username}/"]').count() > 0:
                 return True
             return username.casefold() in page.locator("body").inner_text().casefold()
         except Exception:
             return False
 
+    @staticmethod
+    def _goto_instagram(page: Any, url: str, settle_ms: int = 1_500) -> None:
+        try:
+            page.goto(
+                url,
+                wait_until="domcontentloaded",
+                timeout=60_000,
+            )
+        except Exception as exc:
+            if "interrupted by another navigation" not in str(exc):
+                raise
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=15_000)
+            except Exception:
+                pass
+        page.wait_for_timeout(settle_ms)
+
+    @staticmethod
+    def _continue_expected_onetap(page: Any, expected_account: str) -> bool:
+        try:
+            if "/accounts/onetap" not in str(page.url or "").casefold():
+                return False
+            username = expected_account.lstrip("@")
+            button = page.get_by_role("button").filter(has_text=username)
+            if button.count() != 1 or not button.first.is_enabled():
+                return False
+            button.first.click(timeout=10_000)
+            page.wait_for_timeout(1_500)
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def _brief_error(exc: Exception) -> str:
+        message = str(exc or "").split("Call log:", 1)[0].strip()
+        if "interrupted by another navigation" in message:
+            return "Instagram 로그인 화면 전환을 다시 확인합니다."
+        if "Target page, context or browser has been closed" in message:
+            return "Instagram 자동화 창 연결이 끊겼습니다."
+        return message or exc.__class__.__name__
+
     def _wait_for_account(self, page: Any, expected_account: str) -> bool:
         while not self.stop_event.is_set():
+            if self._continue_expected_onetap(page, expected_account):
+                continue
             if self._account_visible(page, expected_account):
                 return True
             body_text = ""
@@ -235,12 +281,7 @@ class InstagramDMSenderManager:
             self.resume_event.wait()
             if self.stop_event.is_set():
                 return False
-            page.goto(
-                "https://www.instagram.com/",
-                wait_until="domcontentloaded",
-                timeout=60_000,
-            )
-            page.wait_for_timeout(1_500)
+            self._goto_instagram(page, "https://www.instagram.com/")
         return False
 
     @staticmethod
@@ -258,13 +299,12 @@ class InstagramDMSenderManager:
         image_path: Path,
     ) -> None:
         instagram_id = str(target["instagram_id"]).strip().lstrip("@")
-        page.goto(
+        self._goto_instagram(
+            page,
             str(target.get("profile_url") or "")
             or f"https://www.instagram.com/{instagram_id}/",
-            wait_until="domcontentloaded",
-            timeout=60_000,
+            settle_ms=1_300,
         )
-        page.wait_for_timeout(1_300)
 
         profile_text = page.locator("body").inner_text()
         if instagram_id.casefold() not in profile_text.casefold():
@@ -343,12 +383,7 @@ class InstagramDMSenderManager:
             context = browser.contexts[0]
             pages = context.pages
             page = pages[0] if pages else context.new_page()
-            page.goto(
-                "https://www.instagram.com/",
-                wait_until="domcontentloaded",
-                timeout=60_000,
-            )
-            page.wait_for_timeout(1_500)
+            self._goto_instagram(page, "https://www.instagram.com/")
 
             expected_account = str(
                 self.brands[brand].get("expected_account", "")
@@ -440,7 +475,7 @@ class InstagramDMSenderManager:
                     failed = int(self.snapshot().get("failed", 0) or 0) + 1
                     self._set(
                         failed=failed,
-                        last_error=f"@{instagram_id}: {exc}",
+                        last_error=f"@{instagram_id}: {self._brief_error(exc)}",
                         message=(
                             f"@{instagram_id} 실패 · 다음 대상을 계속합니다."
                         ),
@@ -459,8 +494,8 @@ class InstagramDMSenderManager:
         except Exception as exc:
             self._set(
                 status="error",
-                message=f"목표 자동 발송 실패: {exc}",
-                last_error=str(exc),
+                message=f"목표 자동 발송 실패: {self._brief_error(exc)}",
+                last_error=self._brief_error(exc),
                 current_target="",
                 finished_at=datetime.now().isoformat(timespec="seconds"),
             )

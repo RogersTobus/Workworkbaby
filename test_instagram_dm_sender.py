@@ -66,6 +66,58 @@ class InstagramDMSenderManagerTests(unittest.TestCase):
         self.assertEqual(state["completed"], 7)
         self.assertEqual(state["expected_account"], "@gaeagreece_kor")
 
+    def test_instagram_redirect_does_not_fail_navigation(self):
+        class RedirectingPage:
+            waited = False
+            timeout = 0
+
+            def goto(self, *_args, **_kwargs):
+                raise RuntimeError(
+                    "Page.goto: Navigation is interrupted by another navigation"
+                )
+
+            def wait_for_load_state(self, *_args, **_kwargs):
+                self.waited = True
+
+            def wait_for_timeout(self, timeout):
+                self.timeout = timeout
+
+        page = RedirectingPage()
+        InstagramDMSenderManager._goto_instagram(
+            page,
+            "https://www.instagram.com/",
+        )
+        self.assertTrue(page.waited)
+        self.assertEqual(1_500, page.timeout)
+
+    def test_onetap_username_is_not_treated_as_logged_in_account(self):
+        class Body:
+            def inner_text(self):
+                return "Continue as alpnutrition_official_kr"
+
+            def count(self):
+                return 0
+
+        class OneTapPage:
+            url = "https://www.instagram.com/accounts/onetap/?lsrc=ci"
+
+            def locator(self, _selector):
+                return Body()
+
+        self.assertFalse(
+            InstagramDMSenderManager._account_visible(
+                OneTapPage(),
+                "@alpnutrition_official_kr",
+            )
+        )
+
+    def test_navigation_call_log_is_hidden_from_status(self):
+        error = RuntimeError(
+            "Page.goto interrupted by another navigation Call log: details"
+        )
+        message = InstagramDMSenderManager._brief_error(error)
+        self.assertNotIn("Call log", message)
+
 
 if __name__ == "__main__":
     unittest.main()
