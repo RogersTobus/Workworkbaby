@@ -3150,8 +3150,6 @@ def prepare_brand_connect_favorites(
                 candidates.append(
                     {"row": row, "creator": creator, "platform": platform}
                 )
-                if len(candidates) >= count:
-                    break
             return candidates
         finally:
             workbook.close()

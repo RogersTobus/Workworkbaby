@@ -98,8 +98,8 @@ class BrandConnectFavoriteManager:
         if not product_label:
             raise ValueError("선택한 브랜드에 맞는 상품을 선택해주세요.")
         count = int(count)
-        if count not in {10, 20, 30, 40, 50}:
-            raise ValueError("찜 인원은 10명 단위로 10명부터 50명까지 선택해주세요.")
+        if count < 1 or count > 50:
+            raise ValueError("찜 인원은 1명부터 50명까지 처리할 수 있습니다.")
         with self.lock:
             if self.worker and self.worker.is_alive():
                 raise ValueError("이미 찜 자동화가 진행 중입니다.")
@@ -271,11 +271,23 @@ class BrandConnectFavoriteManager:
         )
         if not favorite.count():
             raise RuntimeError("크리에이터 찜 버튼을 찾지 못했습니다.")
-        favorite.first.click(timeout=5000)
+        favorite_button = favorite.first
+        if not favorite_button.is_enabled():
+            raise LookupError("찜 버튼이 비활성화된 크리에이터입니다.")
+        favorite_button.click(timeout=5000)
         page.get_by_text("크리에이터 찜", exact=True).wait_for(
             state="visible",
             timeout=5000,
         )
+
+    @staticmethod
+    def _brief_error(exc: Exception) -> str:
+        message = str(exc or "").split("Call log:", 1)[0].strip()
+        if "Target page, context or browser has been closed" in message:
+            return "브랜드커넥트 탭 연결이 끊겼습니다."
+        if "Timeout" in message:
+            return "화면 응답이 없어 다음 후보로 넘어갑니다."
+        return message or exc.__class__.__name__
 
     @staticmethod
     def _ensure_group(page: Any, group_name: str) -> None:
@@ -374,14 +386,6 @@ class BrandConnectFavoriteManager:
                     except Exception:
                         pass
 
-            def close_unwanted_page(opened_page: Any) -> None:
-                try:
-                    if opened_page != page:
-                        opened_page.close()
-                except Exception:
-                    pass
-
-            context.on("page", close_unwanted_page)
             if not self._wait_for_login(page):
                 raise RuntimeError("네이버 브랜드커넥트 로그인을 확인하지 못했습니다.")
             self._close_popup(page)
@@ -391,11 +395,24 @@ class BrandConnectFavoriteManager:
                 message=f"{group_name} 그룹에 크리에이터를 추가합니다.",
             )
             for candidate in candidates:
-                if self.stop_event.is_set():
+                if self.stop_event.is_set() or len(completed) >= count:
                     break
                 creator = str(candidate.get("creator", "")).strip()
                 self._set(current_creator=creator)
                 try:
+                    if page.is_closed():
+                        page = context.new_page()
+                        page.goto(
+                            BRAND_CONNECT_URL,
+                            wait_until="domcontentloaded",
+                            timeout=60_000,
+                        )
+                        if not self._wait_for_login(page):
+                            raise RuntimeError(
+                                "네이버 브랜드커넥트 로그인을 확인하지 못했습니다."
+                            )
+                        self._close_popup(page)
+                        self._select_platform(page, platform)
                     self._favorite_creator(page, creator, group_name)
                     completed.append(candidate)
                     self._set(
@@ -403,10 +420,14 @@ class BrandConnectFavoriteManager:
                         message=f"{creator} 찜 그룹 추가 완료",
                     )
                 except Exception as exc:
-                    self._close_popup(page)
+                    try:
+                        if not page.is_closed():
+                            self._close_popup(page)
+                    except Exception:
+                        pass
                     self._set(
                         failed=self.snapshot()["failed"] + 1,
-                        message=f"{creator} 건너뜀: {exc}",
+                        message=f"{creator} 건너뜀: {self._brief_error(exc)}",
                     )
             self._set(
                 status="saving",
