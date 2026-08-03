@@ -167,6 +167,7 @@ class PriceUpdateManager:
 
     def _google_service(self):
         try:
+            from google.auth.exceptions import RefreshError
             from google.auth.transport.requests import Request
             from google.oauth2.credentials import Credentials
             from google_auth_oauthlib.flow import InstalledAppFlow
@@ -190,7 +191,13 @@ class PriceUpdateManager:
                 str(token_path), GOOGLE_SCOPE
             )
         if credentials and credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
+            try:
+                credentials.refresh(Request())
+            except RefreshError:
+                # A revoked or expired refresh token cannot be repaired by
+                # retrying. Fall through to the normal interactive login flow
+                # and replace the stale token after authorization succeeds.
+                credentials = None
         if not credentials or not credentials.valid:
             self._set(
                 status="google_login_required",
