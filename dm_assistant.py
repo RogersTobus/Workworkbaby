@@ -2344,39 +2344,34 @@ def save_dm_sync_state(state: dict) -> None:
     os.replace(temporary, DM_SYNC_STATE_PATH)
 
 
+class GoogleDriveLoginRequired(RuntimeError):
+    pass
+
+
 def load_dm_drive_service():
+    from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
 
-    token_info = json.loads(DM_DRIVE_TOKEN_PATH.read_text(encoding="utf-8"))
-    refresh_token = str(token_info.get("refresh_token", "")).strip()
-    if not refresh_token:
-        raise RuntimeError("Google Drive refresh token is missing.")
-    refresh_payload = urlencode(
-        {
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-            "client_id": token_info.get("client_id", ""),
-            "client_secret": token_info.get("client_secret", ""),
-        }
-    ).encode("utf-8")
-    refresh_request = urllib.request.Request(
-        str(token_info.get("token_uri", "https://oauth2.googleapis.com/token")),
-        data=refresh_payload,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        method="POST",
-    )
-    with urllib.request.urlopen(refresh_request, timeout=30) as response:
-        refresh_result = json.loads(response.read().decode("utf-8"))
-    access_token = str(refresh_result.get("access_token", "")).strip()
-    if not access_token:
-        raise RuntimeError("Google Drive access token refresh failed.")
-    token_info["token"] = access_token
-    DM_DRIVE_TOKEN_PATH.write_text(
-        json.dumps(token_info, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    credentials = Credentials(token=access_token)
+    scopes = ["https://www.googleapis.com/auth/drive"]
+    try:
+        credentials = Credentials.from_authorized_user_file(
+            str(DM_DRIVE_TOKEN_PATH), scopes
+        )
+        if credentials.expired and credentials.refresh_token:
+            credentials.refresh(Request())
+            DM_DRIVE_TOKEN_PATH.write_text(
+                credentials.to_json(),
+                encoding="utf-8",
+            )
+    except Exception as exc:
+        raise GoogleDriveLoginRequired(
+            "Google Drive 연결이 만료되었습니다. 다시 연결해 주세요."
+        ) from exc
+    if not credentials.valid:
+        raise GoogleDriveLoginRequired(
+            "Google Drive 연결이 만료되었습니다. 다시 연결해 주세요."
+        )
     return build("drive", "v3", credentials=credentials, cache_discovery=False)
 
 
@@ -2384,23 +2379,28 @@ def download_dm_workbook(temporary: Path, download_url: str) -> str:
     sync_config = dict(CONFIG.get("dm_sync") or {})
     drive_file_id = str(sync_config.get("drive_file_id", "")).strip()
     if drive_file_id and DM_DRIVE_TOKEN_PATH.exists():
-        from googleapiclient.http import MediaIoBaseDownload
+        try:
+            from googleapiclient.http import MediaIoBaseDownload
 
-        service = load_dm_drive_service()
-        metadata = (
-            service.files()
-            .get(fileId=drive_file_id, fields="modifiedTime,size")
-            .execute()
-        )
-        if int(metadata.get("size", "0") or 0) > 25 * 1024 * 1024:
-            raise ValueError("The Drive workbook is larger than the allowed size.")
-        request = service.files().get_media(fileId=drive_file_id)
-        with temporary.open("wb") as output:
-            downloader = MediaIoBaseDownload(output, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-        return str(metadata.get("modifiedTime", ""))
+            service = load_dm_drive_service()
+            metadata = (
+                service.files()
+                .get(fileId=drive_file_id, fields="modifiedTime,size")
+                .execute()
+            )
+            if int(metadata.get("size", "0") or 0) > 25 * 1024 * 1024:
+                raise ValueError("The Drive workbook is larger than the allowed size.")
+            request = service.files().get_media(fileId=drive_file_id)
+            with temporary.open("wb") as output:
+                downloader = MediaIoBaseDownload(output, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+            return str(metadata.get("modifiedTime", ""))
+        except GoogleDriveLoginRequired:
+            # The shared download URL still provides the latest workbook even
+            # when Google's seven-day OAuth testing token has expired.
+            pass
 
     head_request = urllib.request.Request(
         download_url,
@@ -2781,6 +2781,11 @@ def upload_dm_workbook_to_drive() -> dict:
             "message": "Google Drive 원본까지 최신화했습니다.",
             "modified_time": result.get("modifiedTime"),
             "size": result.get("size"),
+        }
+    except GoogleDriveLoginRequired as exc:
+        return {
+            "status": "login_required",
+            "message": str(exc),
         }
     except Exception as exc:
         return {
@@ -3519,11 +3524,9 @@ def save_brand_connect_proposals(
                 save_atomic(workbook)
         finally:
             workbook.close()
-    drive = (
-        upload_dm_workbook_to_drive()
-        if changed
-        else {"status": "skipped", "message": "새로 반영할 제안 결과가 없습니다."}
-    )
+    # Always upload after checking proposals. A previous Drive upload can fail,
+    # so no new local changes does not prove that the remote workbook is current.
+    drive = upload_dm_workbook_to_drive()
     return {
         "sheet_name": source["sheet_name"],
         "matched": matched,
