@@ -56,6 +56,7 @@ class InstagramDMSenderManager:
             "requested": 0,
             "completed": 0,
             "failed": 0,
+            "sent_pending_sheet": 0,
             "current_target": "",
             "last_error": "",
             "started_at": None,
@@ -85,6 +86,15 @@ class InstagramDMSenderManager:
                 raise ValueError("이미 목표 자동 발송이 진행 중입니다.")
 
         dashboard = self.dashboard_callback(brand, True)
+        drive_sync = dict(dashboard.get("dm_sync") or {})
+        drive_status = str(drive_sync.get("status", "")).strip()
+        if drive_status not in {"completed", "current"}:
+            raise ValueError(
+                str(
+                    drive_sync.get("message")
+                    or "Google Drive에 다시 로그인해 주세요."
+                )
+            )
         remaining = int(dashboard.get("remaining_to_goal", 0) or 0)
         if remaining <= 0:
             raise ValueError("이번 주 목표를 이미 달성했습니다.")
@@ -114,6 +124,7 @@ class InstagramDMSenderManager:
                 "requested": remaining,
                 "completed": 0,
                 "failed": 0,
+                "sent_pending_sheet": 0,
                 "current_target": "",
                 "last_error": "",
                 "started_at": datetime.now().isoformat(timespec="seconds"),
@@ -453,11 +464,30 @@ class InstagramDMSenderManager:
                         (record.get("drive_sync") or {}).get("status", "")
                     )
                     if drive_status not in {"completed", "disabled"}:
-                        raise RuntimeError(
-                            (record.get("drive_sync") or {}).get(
-                                "message", "Google Drive 최신화 실패"
-                            )
+                        self._set(
+                            status="login_required",
+                            sent_pending_sheet=(
+                                int(
+                                    self.snapshot().get(
+                                        "sent_pending_sheet", 0
+                                    )
+                                    or 0
+                                )
+                                + 1
+                            ),
+                            current_target=f"@{instagram_id}",
+                            last_error=str(
+                                (record.get("drive_sync") or {}).get(
+                                    "message", "Google Drive 최신화 실패"
+                                )
+                            ),
+                            message=(
+                                f"@{instagram_id}님께 DM은 발송됐지만 시트 기록이 "
+                                "대기 중입니다. Google Drive에 다시 로그인하면 "
+                                "기록을 복구한 뒤 계속할 수 있습니다."
+                            ),
                         )
+                        return
                     completed = int(
                         self.snapshot().get("completed", 0) or 0
                     ) + 1

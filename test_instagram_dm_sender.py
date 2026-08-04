@@ -29,6 +29,7 @@ def dashboard(remaining: int) -> dict:
         ],
         "goal": 20,
         "weekly_sent": 20 - remaining,
+        "dm_sync": {"status": "completed", "message": "ok"},
     }
 
 
@@ -65,6 +66,20 @@ class InstagramDMSenderManagerTests(unittest.TestCase):
         self.assertEqual(state["requested"], 7)
         self.assertEqual(state["completed"], 7)
         self.assertEqual(state["expected_account"], "@gaeagreece_kor")
+
+    def test_start_requires_drive_before_any_send(self):
+        temporary, manager = self.make_manager(7)
+        self.addCleanup(temporary.cleanup)
+        manager.dashboard_callback = lambda _brand, _force: {
+            **dashboard(7),
+            "dm_sync": {
+                "status": "login_required",
+                "message": "Google Drive에 다시 로그인해 주세요.",
+            },
+        }
+        with self.assertRaisesRegex(ValueError, "다시 로그인"):
+            manager.start("gaia")
+        self.assertEqual(manager.snapshot()["status"], "idle")
 
     def test_instagram_redirect_does_not_fail_navigation(self):
         class RedirectingPage:

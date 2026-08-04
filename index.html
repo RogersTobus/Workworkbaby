@@ -218,6 +218,7 @@
         <span id="syncStatus" class="sync-status">온라인 명단 확인 전</span>
         <button id="refreshDm" type="button" class="sync-button">최신 명단 불러오기</button>
         <button id="pushDm" type="button" class="sync-button">구글 시트 최신화</button>
+        <button id="driveLogin" type="button" class="sync-button" hidden>Google 다시 로그인</button>
       </div>
     </div>
 
@@ -395,6 +396,7 @@
         "건너뛰기는 로컬 기록에 저장하며, 작업용 Excel 파일은 닫아둔 상태에서 사용하세요.";
       const sync = dashboard.dm_sync || {};
       $("syncStatus").textContent = sync.message || "온라인 명단 확인 전";
+      $("driveLogin").hidden = sync.status !== "login_required";
       $("bar").style.width = `${Math.min(100, dashboard.weekly_sent / dashboard.goal * 100)}%`;
       renderAutoState();
     }
@@ -700,6 +702,29 @@
         }
         $("syncStatus").textContent = result.message;
         toast(result.message);
+      } catch (error) {
+        $("syncStatus").textContent = error.message;
+        toast(error.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+    $("driveLogin").addEventListener("click", async () => {
+      const button = $("driveLogin");
+      button.disabled = true;
+      $("syncStatus").textContent = "Google 로그인 창에서 연결을 완료해 주세요…";
+      try {
+        const response = await fetch("/api/dm/drive/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}"
+        });
+        const result = await response.json();
+        if (!response.ok || result.status !== "completed") {
+          throw new Error(result.message || "Google Drive 재연결에 실패했습니다.");
+        }
+        toast(result.message);
+        await loadDashboard(false, true);
       } catch (error) {
         $("syncStatus").textContent = error.message;
         toast(error.message, true);

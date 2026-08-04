@@ -2375,32 +2375,73 @@ def load_dm_drive_service():
     return build("drive", "v3", credentials=credentials, cache_discovery=False)
 
 
+def reconnect_dm_drive() -> dict:
+    """Ask the user to sign in, then recover locally recorded DM dates."""
+    credentials_path = APP_DIR / "google_credentials.json"
+    if not credentials_path.is_file():
+        return {
+            "status": "error",
+            "message": "google_credentials.json이 없어 Google Drive에 다시 연결할 수 없습니다.",
+        }
+    try:
+        from google_auth_oauthlib.flow import InstalledAppFlow
+
+        flow = InstalledAppFlow.from_client_secrets_file(
+            str(credentials_path),
+            ["https://www.googleapis.com/auth/drive"],
+        )
+        credentials = flow.run_local_server(port=0, open_browser=True)
+        DM_DRIVE_TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
+        DM_DRIVE_TOKEN_PATH.write_text(
+            credentials.to_json(),
+            encoding="utf-8",
+        )
+        sync_result = sync_dm_workbook(force=True)
+        if sync_result.get("status") not in {"completed", "current"}:
+            return sync_result
+        upload_result = upload_dm_workbook_to_drive()
+        if upload_result.get("status") != "completed":
+            return upload_result
+        return {
+            "status": "completed",
+            "message": (
+                "Google Drive 재연결과 누락 발송 기록 복구를 완료했습니다."
+            ),
+            "sync": sync_result,
+            "upload": upload_result,
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "message": f"Google Drive 재연결 실패: {exc}",
+        }
+
+
 def download_dm_workbook(temporary: Path, download_url: str) -> str:
     sync_config = dict(CONFIG.get("dm_sync") or {})
     drive_file_id = str(sync_config.get("drive_file_id", "")).strip()
-    if drive_file_id and DM_DRIVE_TOKEN_PATH.exists():
-        try:
-            from googleapiclient.http import MediaIoBaseDownload
-
-            service = load_dm_drive_service()
-            metadata = (
-                service.files()
-                .get(fileId=drive_file_id, fields="modifiedTime,size")
-                .execute()
+    if drive_file_id:
+        if not DM_DRIVE_TOKEN_PATH.exists():
+            raise GoogleDriveLoginRequired(
+                "Google Drive 로그인이 필요합니다. 로그인 후 다시 실행해 주세요."
             )
-            if int(metadata.get("size", "0") or 0) > 25 * 1024 * 1024:
-                raise ValueError("The Drive workbook is larger than the allowed size.")
-            request = service.files().get_media(fileId=drive_file_id)
-            with temporary.open("wb") as output:
-                downloader = MediaIoBaseDownload(output, request)
-                done = False
-                while not done:
-                    _, done = downloader.next_chunk()
-            return str(metadata.get("modifiedTime", ""))
-        except GoogleDriveLoginRequired:
-            # The shared download URL still provides the latest workbook even
-            # when Google's seven-day OAuth testing token has expired.
-            pass
+        from googleapiclient.http import MediaIoBaseDownload
+
+        service = load_dm_drive_service()
+        metadata = (
+            service.files()
+            .get(fileId=drive_file_id, fields="modifiedTime,size")
+            .execute()
+        )
+        if int(metadata.get("size", "0") or 0) > 25 * 1024 * 1024:
+            raise ValueError("The Drive workbook is larger than the allowed size.")
+        request = service.files().get_media(fileId=drive_file_id)
+        with temporary.open("wb") as output:
+            downloader = MediaIoBaseDownload(output, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+        return str(metadata.get("modifiedTime", ""))
 
     head_request = urllib.request.Request(
         download_url,
@@ -2540,6 +2581,12 @@ def sync_dm_workbook(force: bool = False) -> dict:
                 last_checked_at=synced_at,
                 last_synced_at=synced_at,
                 last_modified=remote_modified,
+            )
+        except GoogleDriveLoginRequired as exc:
+            DM_SYNC_STATUS.update(
+                status="login_required",
+                message=str(exc),
+                last_checked_at=datetime.now().isoformat(timespec="seconds"),
             )
         except Exception as exc:
             DM_SYNC_STATUS.update(
@@ -4143,6 +4190,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                     )
             elif path == "/api/dm/sync-drive":
                 self.send_json(upload_dm_workbook_to_drive())
+            elif path == "/api/dm/drive/login":
+                self.send_json(reconnect_dm_drive())
             elif path == "/api/dm/auto/start":
                 self.send_json(
                     INSTAGRAM_DM_SENDER.start(

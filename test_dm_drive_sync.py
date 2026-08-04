@@ -20,15 +20,11 @@ class FakeResponse(io.BytesIO):
 
 
 class DriveSyncFallbackTests(unittest.TestCase):
-    def test_download_uses_shared_url_when_drive_login_expired(self):
+    def test_download_requires_login_when_drive_login_expired(self):
         with tempfile.TemporaryDirectory() as directory:
             token_path = Path(directory) / "drive_token.json"
             token_path.write_text("{}", encoding="utf-8")
             destination = Path(directory) / "download.xlsx"
-            responses = [
-                FakeResponse(headers={"Last-Modified": "remote-time"}),
-                FakeResponse(b"xlsx-bytes", headers={"Content-Length": "10"}),
-            ]
             config = {
                 "drive_file_id": "file-id",
                 "download_url": "https://example.invalid/workbook.xlsx",
@@ -41,19 +37,17 @@ class DriveSyncFallbackTests(unittest.TestCase):
                     "load_dm_drive_service",
                     side_effect=dm_assistant.GoogleDriveLoginRequired("expired"),
                 ),
-                patch.object(
-                    dm_assistant.urllib.request,
-                    "urlopen",
-                    side_effect=responses,
-                ),
+                patch.object(dm_assistant.urllib.request, "urlopen") as urlopen,
             ):
-                modified = dm_assistant.download_dm_workbook(
-                    destination,
-                    config["download_url"],
-                )
+                with self.assertRaisesRegex(
+                    dm_assistant.GoogleDriveLoginRequired, "expired"
+                ):
+                    dm_assistant.download_dm_workbook(
+                        destination,
+                        config["download_url"],
+                    )
 
-            self.assertEqual(modified, "remote-time")
-            self.assertEqual(destination.read_bytes(), b"xlsx-bytes")
+            urlopen.assert_not_called()
 
     def test_upload_reports_login_required(self):
         with tempfile.TemporaryDirectory() as directory:
