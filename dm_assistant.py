@@ -62,6 +62,7 @@ CALENDAR_HTML_PATH = APP_DIR / "calendar.html"
 MEETINGS_HTML_PATH = APP_DIR / "meetings.html"
 MEMOS_HTML_PATH = APP_DIR / "memos.html"
 SALES_EMAIL_HTML_PATH = APP_DIR / "sales_email.html"
+CS_TRACKER_HTML_PATH = APP_DIR / "cs_tracker.html"
 BRAND_CONNECTING_HTML_PATH = APP_DIR / "brand_connecting.html"
 WORK_LOG_HTML_PATH = APP_DIR / "work_log.html"
 THEME_CSS_PATH = APP_DIR / "theme_meeting.css"
@@ -90,6 +91,7 @@ CALENDAR_TASKS_PATH = APP_DIR / "calendar_tasks.json"
 MEETING_NOTES_PATH = APP_DIR / "meeting_notes.json"
 PLATFORM_MEMOS_PATH = APP_DIR / "platform_memos.json"
 SALES_EMAIL_DATA_PATH = APP_DIR / "sales_email_data.json"
+CS_CASES_PATH = APP_DIR / "cs_cases.json"
 WORK_LOG_DRAFTS_PATH = APP_DIR / "work_log_drafts.json"
 SALES_EMAIL_ATTACHMENTS_DIR = APP_DIR / "sales_email_attachments"
 DM_REFERENCE_IMAGE_DIR = APP_DIR / "sales_email_assets"
@@ -140,6 +142,7 @@ CALENDAR_SYNC_LOCK = threading.Lock()
 MEETING_NOTES_LOCK = threading.Lock()
 PLATFORM_MEMOS_LOCK = threading.Lock()
 SALES_EMAIL_LOCK = threading.Lock()
+CS_CASES_LOCK = threading.Lock()
 WORK_LOG_LOCK = threading.Lock()
 MEETING_AI_LOCK = threading.Lock()
 MEETING_AI_JOBS_LOCK = threading.Lock()
@@ -324,6 +327,25 @@ def save_platform_memos(memos: list[dict]) -> None:
         encoding="utf-8",
     )
     temporary.replace(PLATFORM_MEMOS_PATH)
+
+
+def load_cs_cases() -> list[dict]:
+    if not CS_CASES_PATH.exists():
+        return []
+    try:
+        data = json.loads(CS_CASES_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def save_cs_cases(cases: list[dict]) -> None:
+    temporary = CS_CASES_PATH.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(cases, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    temporary.replace(CS_CASES_PATH)
 
 
 def default_sales_email_data() -> dict:
@@ -711,6 +733,76 @@ def update_platform_memo(payload: dict) -> dict:
             raise ValueError("지원하지 않는 메모 작업입니다.")
         save_platform_memos(memos)
     return {"ok": True, "memo": response_memo}
+
+
+def get_cs_cases() -> dict:
+    with CS_CASES_LOCK:
+        cases = load_cs_cases()
+    cases.sort(
+        key=lambda item: str(item.get("updated_at", item.get("created_at", ""))),
+        reverse=True,
+    )
+    return {"cases": cases}
+
+
+def update_cs_case(payload: dict) -> dict:
+    action = str(payload.get("action", "")).strip()
+    allowed_statuses = {
+        "접수",
+        "확인 중",
+        "협력사 전달",
+        "처리 중",
+        "보류",
+        "완료",
+    }
+    with CS_CASES_LOCK:
+        cases = load_cs_cases()
+        if action == "save":
+            case_id = str(payload.get("id", "")).strip()
+            values = {
+                "brand": str(payload.get("brand", "")).strip(),
+                "partner": str(payload.get("partner", "")).strip(),
+                "order_number": str(payload.get("order_number", "")).strip(),
+                "tracking_number": str(payload.get("tracking_number", "")).strip(),
+                "customer_name": str(payload.get("customer_name", "")).strip(),
+                "contact": str(payload.get("contact", "")).strip(),
+                "status": str(payload.get("status", "접수")).strip() or "접수",
+            }
+            required = {
+                "brand": "브랜드",
+                "partner": "협력사",
+                "order_number": "주문번호",
+                "customer_name": "주문자명",
+                "contact": "연락처",
+            }
+            missing = [label for key, label in required.items() if not values[key]]
+            if missing:
+                raise ValueError(f"{', '.join(missing)}을(를) 입력해주세요.")
+            if values["status"] not in allowed_statuses:
+                raise ValueError("올바른 진행상황을 선택해주세요.")
+            if any(len(value) > 200 for value in values.values()):
+                raise ValueError("입력값은 항목당 200자까지 입력할 수 있습니다.")
+            now = datetime.now().isoformat(timespec="seconds")
+            case = next(
+                (item for item in cases if item.get("id") == case_id),
+                None,
+            )
+            if case is None:
+                case = {"id": uuid4().hex, "created_at": now}
+                cases.append(case)
+            case.update(values)
+            case["updated_at"] = now
+            response_case = dict(case)
+        elif action == "delete":
+            case_id = str(payload.get("id", "")).strip()
+            if not any(item.get("id") == case_id for item in cases):
+                raise ValueError("삭제할 CS 건을 찾을 수 없습니다.")
+            cases = [item for item in cases if item.get("id") != case_id]
+            response_case = {"id": case_id}
+        else:
+            raise ValueError("지원하지 않는 CS 작업입니다.")
+        save_cs_cases(cases)
+    return {"ok": True, "case": response_case}
 
 
 def ollama_executable() -> Path | None:
@@ -4025,6 +4117,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_html(MEMOS_HTML_PATH)
             elif path == "/sales-email":
                 self.send_html(SALES_EMAIL_HTML_PATH)
+            elif path == "/cs-tracker":
+                self.send_html(CS_TRACKER_HTML_PATH)
             elif path == "/theme-meeting.css":
                 self.send_css(THEME_CSS_PATH)
             elif path == "/glass-theme.css":
@@ -4073,6 +4167,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json(get_platform_memos())
             elif path == "/api/sales-email":
                 self.send_json(public_sales_email_data())
+            elif path == "/api/cs-tracker":
+                self.send_json(get_cs_cases())
             elif path == "/api/brand-connecting":
                 brand_key = parse_qs(parsed.query).get("brand", ["alp"])[0]
                 force_sync = (
@@ -4306,6 +4402,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json(update_platform_memo(payload))
             elif path == "/api/sales-email":
                 self.send_json(update_sales_email_data(payload))
+            elif path == "/api/cs-tracker":
+                self.send_json(update_cs_case(payload))
             elif path == "/api/sales-email/outlook-draft":
                 self.send_json(create_outlook_draft(payload))
             elif path == "/api/meetings/recordings/delete":

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CS 추적기</title>
+  <style>
+    :root{--ink:#16223a;--muted:#73809a;--line:rgba(128,151,192,.27);--blue:#365fe0;--navy:#17243d;--danger:#d34f5d;--bg:#eef3ff}
+    *{box-sizing:border-box}body{margin:0;color:var(--ink);font-family:Pretendard,"Noto Sans KR",Arial,sans-serif;background:radial-gradient(circle at 9% 5%,#dce7ff 0,transparent 35%),radial-gradient(circle at 90% 12%,#e8e2ff 0,transparent 30%),linear-gradient(135deg,#f7f9ff,#edf3fa);min-height:100vh}
+    main{max-width:1480px;margin:auto;padding:34px 26px 70px}header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:20px}.eyebrow{font-size:13px;font-weight:950;letter-spacing:.14em;color:var(--blue)}h1{font-size:42px;line-height:1;margin:9px 0 0}.desc{color:var(--muted);font-size:14px}
+    .nav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px;padding:7px;border:1px solid rgba(255,255,255,.75);border-radius:18px;background:rgba(255,255,255,.52);box-shadow:0 15px 38px rgba(49,68,108,.10);backdrop-filter:blur(22px)}.nav a{padding:11px 14px;border-radius:12px;color:#63708a;text-decoration:none;font-size:14px;font-weight:850}.nav a.active{background:var(--navy);color:#fff;box-shadow:0 8px 18px rgba(23,36,61,.23)}
+    .card{border:1px solid rgba(255,255,255,.8);border-radius:24px;background:rgba(255,255,255,.68);box-shadow:0 22px 52px rgba(42,58,94,.11);backdrop-filter:blur(25px)}.editor{padding:22px;margin-bottom:18px}.editor-head,.list-head{display:flex;align-items:center;justify-content:space-between;gap:15px}h2{font-size:22px;margin:0}.sub{margin:7px 0 0;color:var(--muted);font-size:13px}
+    .form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-top:20px}.field label{display:block;margin:0 0 7px;font-size:12px;font-weight:900;color:#59677f}.field input,.field select,.search,.filter{width:100%;height:47px;border:1px solid #ccd8eb;border-radius:13px;background:rgba(250,252,255,.9);padding:0 13px;color:var(--ink);font:inherit;font-weight:700;outline:none}.field input:focus,.field select:focus,.search:focus,.filter:focus{border-color:#7695ee;box-shadow:0 0 0 3px rgba(54,95,224,.11)}
+    .actions{display:flex;justify-content:flex-end;gap:9px;margin-top:17px}button{border:0;border-radius:12px;padding:12px 18px;font:inherit;font-weight:900;cursor:pointer}.primary{background:var(--blue);color:#fff}.secondary{background:#e9eef8;color:#59667e}.danger{background:#fff0f1;color:var(--danger)}button:disabled{opacity:.5;cursor:not-allowed}
+    .list-card{padding:22px}.count{color:var(--muted);font-size:13px;font-weight:900}.tools{display:grid;grid-template-columns:minmax(260px,1fr) 190px;gap:10px;margin:17px 0}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:17px;background:rgba(255,255,255,.62)}table{width:100%;min-width:1050px;border-collapse:collapse}th{position:sticky;top:0;background:#eef3fc;color:#5d6b84;text-align:left;font-size:12px;padding:13px 14px;white-space:nowrap}td{padding:14px;border-top:1px solid #e2e8f2;font-size:14px;vertical-align:middle}tbody tr{cursor:pointer;transition:.14s}tbody tr:hover{background:#f4f7ff}tbody tr.active{background:#eaf0ff}.order{font-weight:900}.muted{color:var(--muted)}.status{display:inline-flex;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:950;background:#e9eef8;color:#5f6b82;white-space:nowrap}.status[data-status="완료"]{background:#e0f5e9;color:#197148}.status[data-status="보류"]{background:#fff0df;color:#ad6519}.status[data-status="처리 중"],.status[data-status="협력사 전달"]{background:#e7edff;color:#365bc7}.empty{padding:70px 20px;text-align:center;color:#8b96a9}.toast{position:fixed;right:24px;bottom:24px;padding:13px 17px;border-radius:13px;background:#17243d;color:#fff;font-weight:850;opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none}.toast.show{opacity:1;transform:none}
+    @media(max-width:1000px){.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:620px){main{padding:24px 14px 55px}header{align-items:flex-start;flex-direction:column}h1{font-size:35px}.form-grid,.tools{grid-template-columns:1fr}.actions{flex-wrap:wrap}.actions button{flex:1}}
+  </style>
+  <link rel="stylesheet" href="/glass-theme.css">
+</head>
+<body>
+<main>
+  <header><div><div class="eyebrow">TOBUS · CUSTOMER SERVICE</div><h1>CS 추적기</h1></div><div class="desc">접수된 CS 건의 주문·배송 정보와 진행상황을 한곳에서 관리합니다</div></header>
+  <nav class="nav" aria-label="업무 메뉴">
+    <a href="/brand-connecting">브랜드 커넥팅</a><a href="/">Instagram DM</a><a href="/prices">네이버 가격 최신화</a><a href="/simulation">시뮬레이션</a><a href="/calendar">업무 캘린더</a><a href="/work-log">업무기록</a><a href="/meetings">회의록</a><a href="/memos">메모</a><a href="/sales-email">영업메일</a><a class="active" href="/cs-tracker">CS 추적기</a>
+  </nav>
+  <section class="card editor">
+    <div class="editor-head"><div><h2 id="editorTitle">새 CS 등록</h2><p class="sub">필수 정보를 입력하고 진행상황이 바뀔 때마다 수정해주세요.</p></div><button id="newCase" class="secondary" type="button">+ 새 CS</button></div>
+    <div class="form-grid">
+      <div class="field"><label for="brand">브랜드 *</label><input id="brand" maxlength="200" placeholder="예: 가이아"></div>
+      <div class="field"><label for="partner">협력사 *</label><input id="partner" maxlength="200" placeholder="예: 베네피아"></div>
+      <div class="field"><label for="orderNumber">주문번호 *</label><input id="orderNumber" maxlength="200" placeholder="주문번호 입력"></div>
+      <div class="field"><label for="trackingNumber">송장번호</label><input id="trackingNumber" maxlength="200" placeholder="발급 전이면 비워두세요"></div>
+      <div class="field"><label for="customerName">주문자명 *</label><input id="customerName" maxlength="200" placeholder="주문자명 입력"></div>
+      <div class="field"><label for="contact">연락처 *</label><input id="contact" maxlength="200" inputmode="tel" placeholder="010-0000-0000"></div>
+      <div class="field"><label for="status">진행상황 *</label><select id="status"><option>접수</option><option>확인 중</option><option>협력사 전달</option><option>처리 중</option><option>보류</option><option>완료</option></select></div>
+    </div>
+    <div class="actions"><button id="deleteCase" class="danger" type="button" hidden>삭제</button><button id="saveCase" class="primary" type="button">CS 저장</button></div>
+  </section>
+  <section class="card list-card">
+    <div class="list-head"><div><h2>CS 목록</h2><p class="sub">최근 수정한 건부터 표시됩니다. 행을 누르면 바로 수정할 수 있습니다.</p></div><span id="caseCount" class="count">0건</span></div>
+    <div class="tools"><input id="search" class="search" type="search" placeholder="브랜드·협력사·주문번호·이름·연락처 검색"><select id="statusFilter" class="filter"><option value="">전체 진행상황</option><option>접수</option><option>확인 중</option><option>협력사 전달</option><option>처리 중</option><option>보류</option><option>완료</option></select></div>
+    <div class="table-wrap"><table><thead><tr><th>브랜드</th><th>협력사</th><th>주문번호</th><th>송장번호</th><th>주문자명</th><th>연락처</th><th>진행상황</th><th>최근 수정</th></tr></thead><tbody id="caseRows"></tbody></table><div id="empty" class="empty" hidden>등록된 CS 건이 없습니다.</div></div>
+  </section>
+</main>
+<div id="toast" class="toast" role="status"></div>
+<script>
+  let cases=[],selectedId="";
+  const $=id=>document.getElementById(id),fields={brand:$("brand"),partner:$("partner"),order_number:$("orderNumber"),tracking_number:$("trackingNumber"),customer_name:$("customerName"),contact:$("contact"),status:$("status")};
+  const esc=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+  function toast(message){const node=$("toast");node.textContent=message;node.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.classList.remove("show"),2500)}
+  async function request(url,options){const response=await fetch(url,options);const data=await response.json();if(!response.ok)throw new Error(data.error||"처리하지 못했습니다.");return data}
+  function formatDate(value){if(!value)return"";const parsed=new Date(value);return Number.isNaN(parsed.getTime())?value:new Intl.DateTimeFormat("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}).format(parsed)}
+  function filtered(){const keyword=$("search").value.trim().toLowerCase(),status=$("statusFilter").value;return cases.filter(item=>(!status||item.status===status)&&(!keyword||Object.values(item).join(" ").toLowerCase().includes(keyword)))}
+  function render(){const rows=$("caseRows"),items=filtered();rows.replaceChildren();$("caseCount").textContent=`${items.length}건`;$("empty").hidden=items.length>0;if(!items.length)$("empty").textContent=$("search").value||$("statusFilter").value?"조건에 맞는 CS 건이 없습니다.":"등록된 CS 건이 없습니다.";items.forEach(item=>{const tr=document.createElement("tr");if(item.id===selectedId)tr.className="active";tr.innerHTML=`<td><b>${esc(item.brand)}</b></td><td>${esc(item.partner)}</td><td class="order">${esc(item.order_number)}</td><td class="muted">${esc(item.tracking_number||"미입력")}</td><td>${esc(item.customer_name)}</td><td>${esc(item.contact)}</td><td><span class="status" data-status="${esc(item.status)}">${esc(item.status)}</span></td><td class="muted">${esc(formatDate(item.updated_at))}</td>`;tr.addEventListener("click",()=>selectCase(item.id));rows.append(tr)})}
+  function newCase(){selectedId="";Object.entries(fields).forEach(([key,input])=>input.value=key==="status"?"접수":"");$("editorTitle").textContent="새 CS 등록";$("deleteCase").hidden=true;render();fields.brand.focus()}
+  function selectCase(id){const item=cases.find(entry=>entry.id===id);if(!item)return;selectedId=id;Object.entries(fields).forEach(([key,input])=>input.value=item[key]|| (key==="status"?"접수":""));$("editorTitle").textContent="CS 정보 수정";$("deleteCase").hidden=false;render();window.scrollTo({top:0,behavior:"smooth"})}
+  async function saveCase(){const button=$("saveCase");button.disabled=true;try{const payload={action:"save",id:selectedId};Object.entries(fields).forEach(([key,input])=>payload[key]=input.value);const result=await request("/api/cs-tracker",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const index=cases.findIndex(item=>item.id===result.case.id);if(index>=0)cases[index]=result.case;else cases.unshift(result.case);cases.sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));selectedId=result.case.id;selectCase(selectedId);toast("CS 정보를 저장했습니다.")}catch(error){toast(error.message)}finally{button.disabled=false}}
+  async function deleteCase(){if(!selectedId||!confirm("이 CS 건을 삭제할까요?"))return;try{await request("/api/cs-tracker",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"delete",id:selectedId})});cases=cases.filter(item=>item.id!==selectedId);newCase();toast("CS 건을 삭제했습니다.")}catch(error){toast(error.message)}}
+  $("newCase").addEventListener("click",newCase);$("saveCase").addEventListener("click",saveCase);$("deleteCase").addEventListener("click",deleteCase);$("search").addEventListener("input",render);$("statusFilter").addEventListener("change",render);document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="s"){event.preventDefault();saveCase()}});
+  (async()=>{try{const data=await request("/api/cs-tracker");cases=data.cases||[];render()}catch(error){toast(error.message)}})();
+</script>
+</body>
+</html>
