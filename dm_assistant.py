@@ -759,7 +759,17 @@ def update_cs_case(payload: dict) -> dict:
         cases = load_cs_cases()
         if action == "save":
             case_id = str(payload.get("id", "")).strip()
+            existing_case = next(
+                (item for item in cases if item.get("id") == case_id),
+                None,
+            )
+            received_date = str(payload.get("received_date", "")).strip()
+            if not received_date and existing_case is not None:
+                received_date = str(existing_case.get("received_date", "")).strip()
+            if not received_date:
+                received_date = date.today().isoformat()
             values = {
+                "received_date": received_date,
                 "brand": str(payload.get("brand", "")).strip(),
                 "partner": str(payload.get("partner", "")).strip(),
                 "order_number": str(payload.get("order_number", "")).strip(),
@@ -780,13 +790,14 @@ def update_cs_case(payload: dict) -> dict:
                 raise ValueError(f"{', '.join(missing)}을(를) 입력해주세요.")
             if values["status"] not in allowed_statuses:
                 raise ValueError("올바른 진행상황을 선택해주세요.")
+            try:
+                datetime.strptime(values["received_date"], "%Y-%m-%d")
+            except ValueError as exc:
+                raise ValueError("올바른 접수일을 입력해주세요.") from exc
             if any(len(value) > 200 for value in values.values()):
                 raise ValueError("입력값은 항목당 200자까지 입력할 수 있습니다.")
             now = datetime.now().isoformat(timespec="seconds")
-            case = next(
-                (item for item in cases if item.get("id") == case_id),
-                None,
-            )
+            case = existing_case
             if case is None:
                 case = {"id": uuid4().hex, "created_at": now}
                 cases.append(case)

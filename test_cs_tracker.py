@@ -14,6 +14,7 @@ class CSTrackerTests(unittest.TestCase):
                 created = dm_assistant.update_cs_case(
                     {
                         "action": "save",
+                        "received_date": "2026-08-05",
                         "brand": "가이아",
                         "partner": "베네피아",
                         "order_number": "ORDER-1",
@@ -25,6 +26,7 @@ class CSTrackerTests(unittest.TestCase):
                 )["case"]
                 self.assertTrue(created["id"])
                 self.assertEqual("접수", created["status"])
+                self.assertEqual("2026-08-05", created["received_date"])
 
                 updated = dm_assistant.update_cs_case(
                     {
