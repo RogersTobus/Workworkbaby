@@ -27,8 +27,9 @@ class HomeDashboardTests(unittest.TestCase):
         calendar_today.return_value = {
             "date": "2026-08-05",
             "tasks": [
-                {"id": "low", "text": "낮은 우선순위", "priority": 1, "completed": False},
-                {"id": "high", "text": "높은 우선순위", "priority": 3, "completed": False},
+                {"id": "low", "text": "낮은 우선순위", "priority": 1, "status": "review", "completed": False},
+                {"id": "doing", "text": "진행 업무", "priority": 2, "status": "doing", "completed": False},
+                {"id": "high", "text": "높은 우선순위", "priority": 3, "status": "todo", "completed": False},
                 {"id": "done", "text": "완료 업무", "priority": 2, "completed": True},
             ],
             "nearby_events": [
@@ -50,9 +51,12 @@ class HomeDashboardTests(unittest.TestCase):
 
         result = dm_assistant.get_home_dashboard()
 
-        self.assertEqual(result["tasks"]["remaining"], 2)
+        self.assertEqual(result["tasks"]["remaining"], 3)
         self.assertEqual(result["tasks"]["completed"], 1)
-        self.assertEqual(result["tasks"]["items"][0]["id"], "high")
+        self.assertEqual(
+            [item["id"] for item in result["tasks"]["items"]],
+            ["low", "doing", "high"],
+        )
         self.assertEqual([item["id"] for item in result["events"]], ["event-1"])
         self.assertEqual(result["routines"]["remaining"], 1)
         self.assertEqual(result["cs"]["open"], 1)

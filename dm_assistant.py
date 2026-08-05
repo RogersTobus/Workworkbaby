@@ -825,8 +825,10 @@ def get_home_dashboard() -> dict:
         for item in today_tasks
         if not bool(item.get("completed")) and item.get("kind") != "event"
     ]
+    dashboard_status_order = {"review": 0, "doing": 1, "todo": 2}
     incomplete_tasks.sort(
         key=lambda item: (
+            dashboard_status_order.get(str(item.get("status", "todo")), 3),
             -int(item.get("priority", 0) or 0),
             str(item.get("created_at", "")),
         )
