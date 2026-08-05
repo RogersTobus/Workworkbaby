@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from calendar import monthrange
 from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
@@ -11,6 +12,9 @@ GOOGLE_SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
 DATE_PATTERN = re.compile(
     r"(?P<start>\d{2}\.\d{2}\.\d{2})"
     r"(?:\s*~\s*(?P<end>\d{2}\.\d{2}\.\d{2}))?"
+)
+MONTH_HEADER_PATTERN = re.compile(
+    r"^\s*(?P<year>20\d{2})[.\-/년\s]+(?P<month>0?[1-9]|1[0-2])(?:월)?\s*$"
 )
 
 
@@ -52,10 +56,55 @@ def _ranges_overlap(left: dict, right: dict) -> bool:
     return left["date"] <= right["end_date"] and right["date"] <= left["end_date"]
 
 
-def _parse_sheet_values(rows: list[list]) -> list[dict]:
+def _sheet_month_rows(
+    rows: list[list], reference_date: date
+) -> list[tuple[list, tuple[int, int] | None]]:
+    """Keep current/future calendar sections and tag rows with their month."""
+    has_month_headers = any(
+        isinstance(cell, str) and MONTH_HEADER_PATTERN.fullmatch(cell)
+        for row in rows
+        for cell in row
+    )
+    if not has_month_headers:
+        return [(row, None) for row in rows]
+
+    current_month = (reference_date.year, reference_date.month)
+    active_month: tuple[int, int] | None = None
+    selected_rows: list[tuple[list, tuple[int, int] | None]] = []
+    for row in rows:
+        header = next(
+            (
+                MONTH_HEADER_PATTERN.fullmatch(cell)
+                for cell in row
+                if isinstance(cell, str)
+                and MONTH_HEADER_PATTERN.fullmatch(cell)
+            ),
+            None,
+        )
+        if header is not None:
+            active_month = (
+                int(header.group("year")),
+                int(header.group("month")),
+            )
+        if active_month is not None and active_month >= current_month:
+            selected_rows.append((row, active_month))
+    return selected_rows
+
+
+def _overlaps_month(start: date, end: date, month: tuple[int, int]) -> bool:
+    year, month_number = month
+    month_start = date(year, month_number, 1)
+    month_end = date(year, month_number, monthrange(year, month_number)[1])
+    return start <= month_end and month_start <= end
+
+
+def _parse_sheet_values(
+    rows: list[list], reference_date: date | None = None
+) -> list[dict]:
     candidates: list[dict] = []
     exact_counts: Counter[tuple[str, str, str]] = Counter()
-    for row in rows:
+    reference_date = reference_date or date.today()
+    for row, section_month in _sheet_month_rows(rows, reference_date):
         for cell in row:
             if not isinstance(cell, str):
                 continue
@@ -68,6 +117,10 @@ def _parse_sheet_values(rows: list[list]) -> list[dict]:
             start = _parse_date(match.group("start"))
             end = _parse_date(match.group("end") or match.group("start"))
             if end < start:
+                continue
+            if section_month is not None and not _overlaps_month(
+                start, end, section_month
+            ):
                 continue
             exact_key = (
                 event_name.casefold(),
