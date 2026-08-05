@@ -56,6 +56,7 @@ from work_log import build_work_log_draft, latest_or_upcoming_friday
 APP_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = APP_DIR / "config.json"
 HTML_PATH = APP_DIR / "index.html"
+DASHBOARD_HTML_PATH = APP_DIR / "dashboard.html"
 PRICE_HTML_PATH = APP_DIR / "price.html"
 SIMULATION_HTML_PATH = APP_DIR / "simulation.html"
 CALENDAR_HTML_PATH = APP_DIR / "calendar.html"
@@ -814,6 +815,108 @@ def update_cs_case(payload: dict) -> dict:
             raise ValueError("지원하지 않는 CS 작업입니다.")
         save_cs_cases(cases)
     return {"ok": True, "case": response_case}
+
+
+def get_home_dashboard() -> dict:
+    today_data = get_calendar_today()
+    today_tasks = list(today_data.get("tasks") or [])
+    incomplete_tasks = [
+        item
+        for item in today_tasks
+        if not bool(item.get("completed")) and item.get("kind") != "event"
+    ]
+    incomplete_tasks.sort(
+        key=lambda item: (
+            -int(item.get("priority", 0) or 0),
+            str(item.get("created_at", "")),
+        )
+    )
+    completed_tasks = [
+        item
+        for item in today_tasks
+        if bool(item.get("completed")) and item.get("kind") != "event"
+    ]
+
+    events_by_source: dict[str, dict] = {}
+    today_text = str(today_data.get("date") or date.today().isoformat())
+    for event in list(today_data.get("nearby_events") or []):
+        start = str(event.get("event_start", ""))
+        end = str(event.get("event_end", ""))
+        if start and end and not (start <= today_text <= end):
+            continue
+        source_id = str(event.get("source_id") or event.get("id") or "")
+        if source_id and source_id not in events_by_source:
+            events_by_source[source_id] = {
+                "id": source_id,
+                "text": str(event.get("text", "")),
+                "label": str(event.get("event_label", "")),
+                "type": str(event.get("event_type", "")),
+                "type_label": str(event.get("event_type_label", "")),
+            }
+
+    routine_data = get_calendar_checklist_routines()
+    routines = list(routine_data.get("routines") or [])
+    cs_cases = list(get_cs_cases().get("cases") or [])
+    open_cs = [item for item in cs_cases if item.get("status") != "완료"]
+
+    dm_summaries = []
+    for brand_key in ("alp", "gaia"):
+        dashboard = get_dashboard(brand_key, force_sync=False)
+        dm_summaries.append(
+            {
+                "brand_key": brand_key,
+                "brand_name": dashboard.get("brand_name", brand_key.upper()),
+                "goal": int(dashboard.get("goal", 0) or 0),
+                "weekly_sent": int(dashboard.get("weekly_sent", 0) or 0),
+                "remaining": int(dashboard.get("remaining_to_goal", 0) or 0),
+                "pending": int(dashboard.get("pending_count", 0) or 0),
+                "sync": dict(dashboard.get("dm_sync") or {}),
+            }
+        )
+
+    price_state = PRICE_MANAGER.snapshot()
+    automation_states = {
+        "crawl": BRAND_CONNECT_MANAGER.snapshot(),
+        "favorite": BRAND_CONNECT_FAVORITE_MANAGER.snapshot(),
+        "proposal": BRAND_CONNECT_PROPOSAL_MANAGER.snapshot(),
+    }
+    return {
+        "date": today_text,
+        "tasks": {
+            "remaining": len(incomplete_tasks),
+            "completed": len(completed_tasks),
+            "items": incomplete_tasks[:8],
+        },
+        "routines": {
+            "remaining": sum(not bool(item.get("completed")) for item in routines),
+            "completed": sum(bool(item.get("completed")) for item in routines),
+            "items": routines[:8],
+        },
+        "events": list(events_by_source.values())[:8],
+        "cs": {
+            "open": len(open_cs),
+            "total": len(cs_cases),
+            "items": open_cs[:6],
+        },
+        "dm": dm_summaries,
+        "systems": {
+            "prices": {
+                "status": str(price_state.get("status", "idle")),
+                "message": str(price_state.get("message", "")),
+                "processed": int(price_state.get("processed", 0) or 0),
+                "total": int(price_state.get("total", 0) or 0),
+                "last_updated_at": price_state.get("last_updated_at"),
+            },
+            "calendar": dict(CALENDAR_SYNC_STATUS),
+            "automations": {
+                key: {
+                    "status": str(value.get("status", "idle")),
+                    "message": str(value.get("message", "")),
+                }
+                for key, value in automation_states.items()
+            },
+        },
+    }
 
 
 def ollama_executable() -> Path | None:
@@ -4114,6 +4217,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.send_html(HTML_PATH)
+            elif path == "/dashboard":
+                self.send_html(DASHBOARD_HTML_PATH)
             elif path == "/prices":
                 self.send_html(PRICE_HTML_PATH)
             elif path == "/simulation":
@@ -4140,6 +4245,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 brand_key = parse_qs(parsed.query).get("brand", ["alp"])[0]
                 force_sync = parse_qs(parsed.query).get("force_sync", ["0"])[0] == "1"
                 self.send_json(get_dashboard(brand_key, force_sync=force_sync))
+            elif path == "/api/home-dashboard":
+                self.send_json(get_home_dashboard())
             elif path == "/api/dm/reference-image":
                 brand_key = parse_qs(parsed.query).get("brand", [""])[0]
                 image_path = DM_REFERENCE_IMAGES.get(brand_key)
