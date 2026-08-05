@@ -16,6 +16,7 @@ DATE_PATTERN = re.compile(
 MONTH_HEADER_PATTERN = re.compile(
     r"^\s*(?P<year>20\d{2})[.\-/년\s]+(?P<month>0?[1-9]|1[0-2])(?:월)?\s*$"
 )
+EVENT_NAME_QUALIFIERS = {"전체", "화끈딜"}
 
 
 def _google_service(app_dir: Path, config: dict):
@@ -54,6 +55,15 @@ def _parse_date(value: str) -> date:
 
 def _ranges_overlap(left: dict, right: dict) -> bool:
     return left["date"] <= right["end_date"] and right["date"] <= left["end_date"]
+
+
+def _event_name_key(event_name: str) -> str:
+    """Collapse sheet labels that only differ by generic event qualifiers."""
+    tokens = re.split(r"[_\s]+", event_name.casefold())
+    meaningful = [
+        token for token in tokens if token and token not in EVENT_NAME_QUALIFIERS
+    ]
+    return "_".join(meaningful)
 
 
 def _sheet_month_rows(
@@ -130,7 +140,7 @@ def _parse_sheet_values(
             exact_counts[exact_key] += 1
             candidates.append(
                 {
-                    "name_key": event_name.casefold(),
+                    "name_key": _event_name_key(event_name),
                     "date": start.isoformat(),
                     "end_date": end.isoformat(),
                     "text": event_name,

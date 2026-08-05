@@ -5,6 +5,19 @@ from calendar_sync import _parse_sheet_values
 
 
 class CalendarSyncParsingTest(unittest.TestCase):
+    def test_merges_generic_qualifier_variants_for_same_event(self):
+        rows = [
+            ["2026.08"],
+            ["현대H몰_전체_8월 초특가행사_26.08.08~26.08.17"],
+            ["현대H몰_전체_8월 초특가행사_26.08.08~26.08.17"],
+            ["현대H몰_8월 초특가행사_화끈딜_26.08.08~26.08.17"],
+        ]
+
+        events = _parse_sheet_values(rows, reference_date=date(2026, 8, 5))
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["text"], "현대H몰_전체_8월 초특가행사")
+
     def test_ignores_past_month_sections(self):
         rows = [
             ["2026.08"],
