@@ -625,6 +625,18 @@
       );
     }
 
+    function assignEventLanes(events){
+      const laneEnds=[];
+      const lanes=new Map();
+      events.forEach(event=>{
+        let lane=laneEnds.findIndex(end=>end<event.start);
+        if(lane<0) lane=laneEnds.length;
+        lanes.set(event,lane);
+        laneEnds[lane]=event.end;
+      });
+      return lanes;
+    }
+
     function renderEventStrip(){
       eventStripList.replaceChildren();
       const dayColumns=[
@@ -663,7 +675,7 @@
       });
     }
 
-    function renderEventBars(events, gridStart){
+    function renderEventBars(events, gridStart, eventLanes){
       const weekCount=Math.ceil(grid.querySelectorAll(".day").length/7);
       const appendSegment=(event,row,startColumn,endColumn,lane)=>{
           const bar=document.createElement("div");bar.className=`calendar-event-bar${eventTypeClass(event.task)}`;
@@ -675,28 +687,16 @@
           bar.append(text,taskActions(event.task));grid.append(bar);
       };
       for(let row=1;row<=weekCount;row++){
-        const assignments=new Map();
-        for(let column=1;column<=7;column++){
-          const day=new Date(gridStart);
-          day.setDate(gridStart.getDate()+(row-1)*7+(column-1));
-          if(day.getMonth()!==viewDate.getMonth()) continue;
-          activeEventsForDay(events,day).forEach((event,lane)=>{
-            const key=event.task.source_id||event.task.id;
-            if(!assignments.has(key)) assignments.set(key,{event,positions:[]});
-            assignments.get(key).positions.push({column,lane});
-          });
-        }
-        assignments.forEach(({event,positions})=>{
-          let segmentStart=positions[0];
-          let previous=positions[0];
-          positions.slice(1).forEach(position=>{
-            if(position.column!==previous.column+1||position.lane!==previous.lane){
-              appendSegment(event,row,segmentStart.column,previous.column,segmentStart.lane);
-              segmentStart=position;
-            }
-            previous=position;
-          });
-          appendSegment(event,row,segmentStart.column,previous.column,segmentStart.lane);
+        const weekStart=new Date(gridStart);
+        weekStart.setDate(gridStart.getDate()+(row-1)*7);
+        const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+6);
+        events.forEach(event=>{
+          const visibleStart=event.start>weekStart?event.start:weekStart;
+          const visibleEnd=event.end<weekEnd?event.end:weekEnd;
+          if(visibleStart>visibleEnd) return;
+          const startColumn=Math.round((visibleStart-weekStart)/86400000)+1;
+          const endColumn=Math.round((visibleEnd-weekStart)/86400000)+1;
+          appendSegment(event,row,startColumn,endColumn,eventLanes.get(event)||0);
         });
       }
     }
@@ -741,6 +741,7 @@
       const daysInMonth=new Date(viewDate.getFullYear(),viewDate.getMonth()+1,0).getDate();
       const totalCells=Math.ceil((mondayOffset+daysInMonth)/7)*7;
       const events=calendarEvents();
+      const eventLanes=assignEventLanes(events);
       for(let index=0;index<totalCells;index++){
         const day=new Date(start);day.setDate(start.getDate()+index);
         const inside=day.getMonth()===viewDate.getMonth();
@@ -789,7 +790,8 @@
           cell.append(head,composer);
           if(activeEvents.length){
             const eventSpace=document.createElement("div");eventSpace.className="event-space";
-            eventSpace.style.height=`${activeEvents.length*25}px`;
+            const laneCount=Math.max(...activeEvents.map(event=>eventLanes.get(event)||0))+1;
+            eventSpace.style.height=`${laneCount*25}px`;
             cell.append(eventSpace);
           }
           const list=document.createElement("div");list.className="tasks";
@@ -800,7 +802,7 @@
         }
         grid.append(cell);
       }
-      renderEventBars(events,start);
+      renderEventBars(events,start,eventLanes);
       renderEventStrip();
       renderBoard();
     }
