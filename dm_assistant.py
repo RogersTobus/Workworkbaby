@@ -1051,10 +1051,57 @@ def get_home_dashboard() -> dict:
 
     price_state = PRICE_MANAGER.snapshot()
     automation_states = {
+        "dm": INSTAGRAM_DM_SENDER.snapshot(),
         "crawl": BRAND_CONNECT_MANAGER.snapshot(),
         "favorite": BRAND_CONNECT_FAVORITE_MANAGER.snapshot(),
         "proposal": BRAND_CONNECT_PROPOSAL_MANAGER.snapshot(),
     }
+    action_items = []
+    drive_sync = dict((dm_summaries[0].get("sync") if dm_summaries else {}) or {})
+    drive_status = str(drive_sync.get("status", ""))
+    if drive_status in {"login_required", "error"}:
+        action_items.append(
+            {
+                "key": "google_drive",
+                "title": "Google Drive 연결 확인 필요",
+                "message": str(
+                    drive_sync.get("message")
+                    or "Google Drive에 다시 로그인해 주세요."
+                ),
+                "href": "/",
+                "severity": "error",
+            }
+        )
+    if int(automation_states["dm"].get("sent_pending_sheet", 0) or 0):
+        action_items.append(
+            {
+                "key": "dm_pending_sheet",
+                "title": "DM 발송 기록 복구 필요",
+                "message": str(automation_states["dm"].get("message", "")),
+                "href": "/",
+                "severity": "error",
+            }
+        )
+    automation_labels = {
+        "dm": ("Instagram DM 자동 발송", "/"),
+        "crawl": ("크리에이터 명단 수집", "/brand-connecting"),
+        "favorite": ("크리에이터 찜", "/brand-connecting"),
+        "proposal": ("제안 결과 확인", "/brand-connecting"),
+    }
+    for key, state in automation_states.items():
+        status = str(state.get("status", ""))
+        if status not in {"error", "login_required", "account_required"}:
+            continue
+        title, href = automation_labels[key]
+        action_items.append(
+            {
+                "key": f"automation_{key}",
+                "title": f"{title} 확인 필요",
+                "message": str(state.get("message", "")),
+                "href": href,
+                "severity": "error" if status == "error" else "warning",
+            }
+        )
     return {
         "date": today_text,
         "tasks": {
@@ -1074,6 +1121,7 @@ def get_home_dashboard() -> dict:
             "items": open_cs[:6],
         },
         "dm": dm_summaries,
+        "action_items": action_items,
         "systems": {
             "prices": {
                 "status": str(price_state.get("status", "idle")),
@@ -2889,7 +2937,6 @@ def sync_dm_workbook(force: bool = False) -> dict:
     download_url = str(sync_config.get("download_url", "")).strip()
     if not download_url:
         return dict(DM_SYNC_STATUS)
-
     with DM_SYNC_LOCK:
         now = datetime.now()
         interval = int(sync_config.get("check_interval_seconds", 60))
@@ -2982,6 +3029,16 @@ def sync_dm_workbook(force: bool = False) -> dict:
             except OSError:
                 pass
         return dict(DM_SYNC_STATUS)
+
+
+def require_dm_workbook_sync(force: bool = True) -> dict:
+    """Fail closed when an automation cannot verify the Drive workbook."""
+    status = sync_dm_workbook(force=force)
+    if str(status.get("status", "")) not in {"completed", "current"}:
+        raise GoogleDriveLoginRequired(
+            str(status.get("message") or "Google Drive에 다시 로그인해 주세요.")
+        )
+    return status
 
 
 def get_dashboard(brand_key: str, force_sync: bool = False) -> dict:
@@ -3226,7 +3283,7 @@ def prepare_brand_connect_crawl(brand_key: str) -> set[str]:
     source = BRAND_CONNECTING_SHEETS.get(brand_key)
     if source is None:
         raise ValueError("지원하지 않는 브랜드입니다.")
-    sync_dm_workbook(force=True)
+    require_dm_workbook_sync(force=True)
     with LOCK:
         workbook = load_workbook(
             CONFIG["_workbook_path"],
@@ -3521,7 +3578,7 @@ def prepare_brand_connect_favorites(
     platform_label = FAVORITE_PLATFORM_LABELS.get(platform)
     if source is None or not product_label or not platform_label:
         raise ValueError("올바른 브랜드·채널·상품을 선택해주세요.")
-    sync_dm_workbook(force=True)
+    require_dm_workbook_sync(force=True)
     cleanup_brand_connect_favorite_marks(brand_key, upload=True)
     favorite_ledger = load_brand_connect_favorite_ledger()
     with LOCK:
@@ -3999,10 +4056,72 @@ BRAND_CONNECT_FAVORITE_MANAGER = BrandConnectFavoriteManager(
 )
 BRAND_CONNECT_PROPOSAL_MANAGER = BrandConnectProposalManager(
     APP_DIR,
-    lambda: sync_dm_workbook(force=True),
+    lambda: require_dm_workbook_sync(force=True),
     save_brand_connect_proposals,
 )
 BRAND_CONNECT_CAMPAIGNS_LOCK = threading.Lock()
+
+
+AUTOMATION_START_LOCK = threading.Lock()
+ACTIVE_AUTOMATION_STATUSES = {
+    "queued",
+    "starting",
+    "opening_browser",
+    "crawling",
+    "preparing",
+    "running",
+    "saving",
+    "writing",
+    "stopping",
+    "login_required",
+    "google_login_required",
+    "naver_login_required",
+    "naver_security_required",
+    "naver_security_restarting",
+    "account_required",
+}
+
+
+def browser_automation_snapshots() -> dict[str, dict]:
+    return {
+        "dm": INSTAGRAM_DM_SENDER.snapshot(),
+        "prices": PRICE_MANAGER.snapshot(),
+        "crawl": BRAND_CONNECT_MANAGER.snapshot(),
+        "favorite": BRAND_CONNECT_FAVORITE_MANAGER.snapshot(),
+        "proposal": BRAND_CONNECT_PROPOSAL_MANAGER.snapshot(),
+    }
+
+
+def start_exclusive_browser_automation(name: str, callback):
+    labels = {
+        "dm": "Instagram DM 자동 발송",
+        "prices": "네이버 가격 최신화",
+        "crawl": "크리에이터 명단 수집",
+        "favorite": "크리에이터 찜",
+        "proposal": "제안 결과 확인",
+    }
+    with AUTOMATION_START_LOCK:
+        conflicts = [
+            labels.get(key, key)
+            for key, state in browser_automation_snapshots().items()
+            if key != name
+            and str(state.get("status", "")) in ACTIVE_AUTOMATION_STATUSES
+        ]
+        if conflicts:
+            raise ValueError(
+                f"{conflicts[0]} 작업이 진행 중입니다. 완료 또는 중단 후 시작해주세요."
+            )
+        return callback()
+
+
+def start_drive_browser_automation(name: str, callback):
+    """Start a browser job only after the current Drive source is available."""
+
+    def checked_start():
+        require_dm_workbook_sync(force=True)
+        return callback()
+
+    return start_exclusive_browser_automation(name, checked_start)
 
 
 def load_brand_connect_campaigns(brand: str) -> dict:
@@ -4587,8 +4706,11 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json(reconnect_dm_drive())
             elif path == "/api/dm/auto/start":
                 self.send_json(
-                    INSTAGRAM_DM_SENDER.start(
-                        str(payload.get("brand", "")).strip()
+                    start_exclusive_browser_automation(
+                        "dm",
+                        lambda: INSTAGRAM_DM_SENDER.start(
+                            str(payload.get("brand", "")).strip()
+                        ),
                     )
                 )
             elif path == "/api/dm/auto/resume":
@@ -4596,13 +4718,6 @@ class RequestHandler(BaseHTTPRequestHandler):
             elif path == "/api/dm/auto/stop":
                 self.send_json(INSTAGRAM_DM_SENDER.stop())
             elif path == "/api/brand-connecting/crawl/start":
-                if (
-                    BRAND_CONNECT_FAVORITE_MANAGER.is_running()
-                    or BRAND_CONNECT_PROPOSAL_MANAGER.is_running()
-                ):
-                    raise ValueError(
-                        "다른 브랜드커넥트 자동화가 진행 중입니다. 완료 후 명단 수집을 시작해주세요."
-                    )
                 source = str(payload.get("source", "both"))
                 platforms = {
                     "blog": ["blog"],
@@ -4612,10 +4727,13 @@ class RequestHandler(BaseHTTPRequestHandler):
                 if platforms is None:
                     raise ValueError("올바른 크롤링 대상을 선택해주세요.")
                 self.send_json(
-                    BRAND_CONNECT_MANAGER.start(
-                        str(payload.get("brand", "")),
-                        platforms,
-                        int(payload.get("count", 100)),
+                    start_drive_browser_automation(
+                        "crawl",
+                        lambda: BRAND_CONNECT_MANAGER.start(
+                            str(payload.get("brand", "")),
+                            platforms,
+                            int(payload.get("count", 100)),
+                        ),
                     )
                 )
             elif path == "/api/brand-connecting/crawl/resume":
@@ -4623,18 +4741,15 @@ class RequestHandler(BaseHTTPRequestHandler):
             elif path == "/api/brand-connecting/crawl/stop":
                 self.send_json(BRAND_CONNECT_MANAGER.stop())
             elif path == "/api/brand-connecting/favorite/start":
-                if BRAND_CONNECT_MANAGER.snapshot().get(
-                    "status"
-                ) in FAVORITE_RUNNING_STATUSES or BRAND_CONNECT_PROPOSAL_MANAGER.is_running():
-                    raise ValueError(
-                        "다른 브랜드커넥트 자동화가 진행 중입니다. 완료 후 찜 자동화를 시작해주세요."
-                    )
                 self.send_json(
-                    BRAND_CONNECT_FAVORITE_MANAGER.start(
-                        str(payload.get("brand", "")),
-                        str(payload.get("platform", "")),
-                        str(payload.get("product", "")),
-                        int(payload.get("count", 10)),
+                    start_drive_browser_automation(
+                        "favorite",
+                        lambda: BRAND_CONNECT_FAVORITE_MANAGER.start(
+                            str(payload.get("brand", "")),
+                            str(payload.get("platform", "")),
+                            str(payload.get("product", "")),
+                            int(payload.get("count", 10)),
+                        ),
                     )
                 )
             elif path == "/api/brand-connecting/favorite/resume":
@@ -4644,21 +4759,16 @@ class RequestHandler(BaseHTTPRequestHandler):
             elif path == "/api/brand-connecting/favorite/stop":
                 self.send_json(BRAND_CONNECT_FAVORITE_MANAGER.stop())
             elif path == "/api/brand-connecting/proposal/start":
-                if (
-                    BRAND_CONNECT_MANAGER.snapshot().get("status")
-                    in PROPOSAL_RUNNING_STATUSES
-                    or BRAND_CONNECT_FAVORITE_MANAGER.is_running()
-                ):
-                    raise ValueError(
-                        "다른 브랜드커넥트 자동화가 진행 중입니다. 완료 후 제안 확인을 시작해주세요."
-                    )
                 campaigns = payload.get("campaigns")
                 if not isinstance(campaigns, list):
                     raise ValueError("확인할 캠페인 링크를 입력해주세요.")
                 self.send_json(
-                    BRAND_CONNECT_PROPOSAL_MANAGER.start(
-                        str(payload.get("brand", "")),
-                        campaigns,
+                    start_drive_browser_automation(
+                        "proposal",
+                        lambda: BRAND_CONNECT_PROPOSAL_MANAGER.start(
+                            str(payload.get("brand", "")),
+                            campaigns,
+                        ),
                     )
                 )
             elif path == "/api/brand-connecting/proposal/resume":
@@ -4677,7 +4787,11 @@ class RequestHandler(BaseHTTPRequestHandler):
             elif path == "/api/brand-connecting/proposal/campaigns":
                 self.send_json(save_brand_connect_campaigns(payload))
             elif path == "/api/prices/start":
-                self.send_json(PRICE_MANAGER.start())
+                self.send_json(
+                    start_exclusive_browser_automation(
+                        "prices", PRICE_MANAGER.start
+                    )
+                )
             elif path == "/api/prices/resume":
                 self.send_json(PRICE_MANAGER.resume_after_login())
             elif path == "/api/prices/stop":

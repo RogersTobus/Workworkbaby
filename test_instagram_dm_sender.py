@@ -133,6 +133,17 @@ class InstagramDMSenderManagerTests(unittest.TestCase):
         message = InstagramDMSenderManager._brief_error(error)
         self.assertNotIn("Call log", message)
 
+    def test_drive_is_rechecked_with_force_before_each_target(self):
+        temporary, manager = self.make_manager(7)
+        self.addCleanup(temporary.cleanup)
+        calls = []
+        manager.dashboard_callback = lambda brand, force: (
+            calls.append((brand, force)) or dashboard(7)
+        )
+        result = manager._wait_for_drive("gaia")
+        self.assertEqual(result["dm_sync"]["status"], "completed")
+        self.assertEqual(calls, [("gaia", True)])
+
 
 if __name__ == "__main__":
     unittest.main()

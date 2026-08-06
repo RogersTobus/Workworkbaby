@@ -5,6 +5,7 @@ import dm_assistant
 
 
 class HomeDashboardTests(unittest.TestCase):
+    @patch.object(dm_assistant.INSTAGRAM_DM_SENDER, "snapshot")
     @patch.object(dm_assistant.BRAND_CONNECT_PROPOSAL_MANAGER, "snapshot")
     @patch.object(dm_assistant.BRAND_CONNECT_FAVORITE_MANAGER, "snapshot")
     @patch.object(dm_assistant.BRAND_CONNECT_MANAGER, "snapshot")
@@ -23,6 +24,7 @@ class HomeDashboardTests(unittest.TestCase):
         crawl_snapshot,
         favorite_snapshot,
         proposal_snapshot,
+        dm_sender_snapshot,
     ):
         calendar_today.return_value = {
             "date": "2026-08-05",
@@ -48,6 +50,9 @@ class HomeDashboardTests(unittest.TestCase):
         crawl_snapshot.return_value = {"status": "idle", "message": "대기 중"}
         favorite_snapshot.return_value = {"status": "running", "message": "처리 중"}
         proposal_snapshot.return_value = {"status": "error", "message": "로그인 필요"}
+        dm_sender_snapshot.return_value = {
+            "status": "idle", "message": "대기 중", "sent_pending_sheet": 0
+        }
 
         result = dm_assistant.get_home_dashboard()
 
@@ -63,6 +68,8 @@ class HomeDashboardTests(unittest.TestCase):
         self.assertEqual(len(result["dm"]), 2)
         self.assertNotIn("targets", result["dm"][0])
         self.assertEqual(result["systems"]["automations"]["favorite"]["status"], "running")
+        self.assertEqual(result["systems"]["automations"]["dm"]["status"], "idle")
+        self.assertEqual(result["action_items"][0]["key"], "automation_proposal")
 
 
 if __name__ == "__main__":

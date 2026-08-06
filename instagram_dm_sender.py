@@ -161,6 +161,30 @@ class InstagramDMSenderManager:
         )
         return self.snapshot()
 
+    @staticmethod
+    def _drive_ready(dashboard: dict[str, Any]) -> bool:
+        status = str((dashboard.get("dm_sync") or {}).get("status", "")).strip()
+        return status in {"completed", "current"}
+
+    def _wait_for_drive(self, brand: str) -> dict[str, Any]:
+        """Pause before the next send until the workbook is safely connected."""
+        while not self.stop_event.is_set():
+            dashboard = self.dashboard_callback(brand, True)
+            if self._drive_ready(dashboard):
+                return dashboard
+            sync = dict(dashboard.get("dm_sync") or {})
+            self.resume_event.clear()
+            self._set(
+                status="login_required",
+                message=str(
+                    sync.get("message")
+                    or "Google Drive에 다시 로그인한 뒤 계속해주세요."
+                ),
+                last_error=str(sync.get("message") or "Google Drive 연결 필요"),
+            )
+            self.resume_event.wait()
+        raise InterruptedError
+
     def _chrome_path(self) -> Path:
         candidates = [
             Path(os.environ.get("PROGRAMFILES", ""))
@@ -404,7 +428,9 @@ class InstagramDMSenderManager:
 
             image_path = self.reference_images[brand]
             while not self.stop_event.is_set():
-                dashboard = self.dashboard_callback(brand, False)
+                # Every target is gated by a fresh Drive check.  This prevents
+                # sending first and discovering an expired connection later.
+                dashboard = self._wait_for_drive(brand)
                 remaining = int(
                     dashboard.get("remaining_to_goal", 0) or 0
                 )
@@ -464,6 +490,7 @@ class InstagramDMSenderManager:
                         (record.get("drive_sync") or {}).get("status", "")
                     )
                     if drive_status not in {"completed", "disabled"}:
+                        self.resume_event.clear()
                         self._set(
                             status="login_required",
                             sent_pending_sheet=(
@@ -487,7 +514,12 @@ class InstagramDMSenderManager:
                                 "기록을 복구한 뒤 계속할 수 있습니다."
                             ),
                         )
-                        return
+                        self.resume_event.wait()
+                        if self.stop_event.is_set():
+                            raise InterruptedError
+                        # Reconnection downloads the source, merges the locally
+                        # recorded sent date, and uploads it before the next DM.
+                        self._wait_for_drive(brand)
                     completed = int(
                         self.snapshot().get("completed", 0) or 0
                     ) + 1
