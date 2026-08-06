@@ -64,6 +64,7 @@ MEETINGS_HTML_PATH = APP_DIR / "meetings.html"
 MEMOS_HTML_PATH = APP_DIR / "memos.html"
 SALES_EMAIL_HTML_PATH = APP_DIR / "sales_email.html"
 CS_TRACKER_HTML_PATH = APP_DIR / "cs_tracker.html"
+REVIEW_MANAGEMENT_HTML_PATH = APP_DIR / "review_management.html"
 BRAND_CONNECTING_HTML_PATH = APP_DIR / "brand_connecting.html"
 WORK_LOG_HTML_PATH = APP_DIR / "work_log.html"
 THEME_CSS_PATH = APP_DIR / "theme_meeting.css"
@@ -93,6 +94,7 @@ MEETING_NOTES_PATH = APP_DIR / "meeting_notes.json"
 PLATFORM_MEMOS_PATH = APP_DIR / "platform_memos.json"
 SALES_EMAIL_DATA_PATH = APP_DIR / "sales_email_data.json"
 CS_CASES_PATH = APP_DIR / "cs_cases.json"
+REVIEW_TEMPLATES_PATH = APP_DIR / "app_data" / "review_templates.json"
 WORK_LOG_DRAFTS_PATH = APP_DIR / "work_log_drafts.json"
 SALES_EMAIL_ATTACHMENTS_DIR = APP_DIR / "sales_email_attachments"
 DM_REFERENCE_IMAGE_DIR = APP_DIR / "sales_email_assets"
@@ -144,6 +146,7 @@ MEETING_NOTES_LOCK = threading.Lock()
 PLATFORM_MEMOS_LOCK = threading.Lock()
 SALES_EMAIL_LOCK = threading.Lock()
 CS_CASES_LOCK = threading.Lock()
+REVIEW_TEMPLATES_LOCK = threading.Lock()
 WORK_LOG_LOCK = threading.Lock()
 MEETING_AI_LOCK = threading.Lock()
 MEETING_AI_JOBS_LOCK = threading.Lock()
@@ -347,6 +350,176 @@ def save_cs_cases(cases: list[dict]) -> None:
         encoding="utf-8",
     )
     temporary.replace(CS_CASES_PATH)
+
+
+DEFAULT_REVIEW_TEMPLATES = {
+    "alp": [
+        {
+            "id": "alp-quality",
+            "title": "품질 / 신선도 만족",
+            "keywords": ["품질", "신선도", "만족", "믿고 구매"],
+            "message": "안녕하세요 고객님 :) 알프뉴트리션 제품의 품질을 만족스럽게 경험해 주시고 소중한 리뷰까지 남겨주셔서 감사합니다. 앞으로도 안심하고 꾸준히 드실 수 있도록 좋은 품질로 보답하겠습니다. 건강하고 활기찬 하루 보내세요!",
+        },
+        {
+            "id": "alp-routine",
+            "title": "맛 / 섭취 편의 만족",
+            "keywords": ["간편", "맛", "하루 한 병", "꾸준히"],
+            "message": "안녕하세요 고객님 :) 바쁜 일상 속에서 알프뉴트리션을 간편한 영양 루틴으로 잘 챙겨 드시고 계시다니 기쁩니다. 매일 부담 없이 꾸준히 섭취하시며 건강한 변화를 느껴보시길 바랍니다. 정성스러운 후기 감사합니다!",
+        },
+        {
+            "id": "alp-repeat",
+            "title": "재구매 / 선물 만족",
+            "keywords": ["재구매", "선물", "가족", "부모님"],
+            "message": "안녕하세요 고객님 :) 알프뉴트리션을 다시 찾아주시고 소중한 분을 위한 제품으로 선택해 주셔서 진심으로 감사합니다. 보내주신 믿음에 보답할 수 있도록 언제나 꼼꼼한 품질과 서비스로 준비하겠습니다.",
+        },
+        {
+            "id": "alp-delivery",
+            "title": "배송 / 포장 만족",
+            "keywords": ["배송", "포장", "빠름", "안전"],
+            "message": "안녕하세요 고객님 :) 제품을 안전하고 빠르게 받아보셨다니 다행입니다. 배송과 포장까지 만족하실 수 있도록 앞으로도 세심하게 준비하겠습니다. 소중한 후기 남겨주셔서 감사합니다!",
+        },
+        {
+            "id": "alp-improve",
+            "title": "아쉬움 / 개선 의견",
+            "keywords": ["아쉬움", "불편", "개선", "문의"],
+            "message": "안녕하세요 고객님. 이용 중 아쉬움을 드려 죄송합니다. 남겨주신 의견은 담당 부서와 꼼꼼히 확인하여 더 나은 제품과 서비스로 개선할 수 있도록 하겠습니다. 정확한 확인이 필요한 경우 주문 정보와 함께 고객센터로 문의해 주시면 신속히 도와드리겠습니다.",
+        },
+    ],
+    "gaia": [
+        {
+            "id": "gaia-taste",
+            "title": "맛 / 풍미 만족",
+            "keywords": ["풍미가 좋다", "고소하다", "신선하다", "향이 깔끔하다", "샐러드", "빵", "파스타"],
+            "message": "안녕하세요 고객님 :)\n가이아코리아 공식몰입니다.\n\n가이아 올리브오일의 신선한 풍미를 만족스럽게 느껴주셔서 정말 감사합니다.\n\n가이아는 그리스 올리브오일의 신선한 풍미를 고객님께 최대한 그대로 전해드리기 위해 세심하게 관리하고 있습니다. 샐러드, 빵, 파스타 등 다양한 음식과 잘 어울리도록 맛과 향의 밸런스도 중요하게 살피고 있습니다.\n\n앞으로도 좋은 품질의 올리브오일로 만족드릴 수 있도록 노력하겠습니다!\n평안한 하루 되세요.",
+        },
+        {
+            "id": "gaia-quality",
+            "title": "품질 / 신선도 만족",
+            "keywords": ["신선하다", "퀄리티 좋다", "믿고 먹는다", "만족스럽다", "가성비 좋다"],
+            "message": "안녕하세요 고객님 :)\n가이아코리아 공식몰입니다.\n\n먼저 저희 제품을 구매해주셔서 감사합니다.\n\n가이아는 항공 직수입 오더메이드 시스템으로 최신 병입 생산된 신선한 올리브오일을 수입하여, 그리스 자연이 준 신선함을 그대로 고객님께 전달하기 위해 세심하게 신경 쓰고 있습니다. 그 노력을 알아주신 것 같아 큰 보람을 느낍니다.\n\n매일매일 건강하고 활기찬 하루를 보내시는 데 저희 오일이 작은 보탬이 되기를 진심으로 바랍니다.\n다 드시면 언제든 편하게 다시 찾아주세요!",
+        },
+        {
+            "id": "gaia-repeat",
+            "title": "재구매 / 선물 만족",
+            "keywords": ["재구매했다", "또 주문했다", "선물용", "부모님", "가족"],
+            "message": "안녕하세요 고객님 :)\n가이아코리아 공식몰입니다.\n\n먼저 저희 제품을 구매해주셔서 감사합니다.\n\n소중한 분들과 함께 드실 제품으로 가이아를 선택해 주셔서 더욱 감사한 마음입니다.\n\n앞으로도 꾸준히 만족드릴 수 있도록 좋은 품질로 보답하겠습니다.\n평안한 하루 되세요.",
+        },
+        {
+            "id": "gaia-price",
+            "title": "가격 관련 의견",
+            "keywords": ["가격이 비싸다", "할인할 때 구매", "가격 부담"],
+            "message": "안녕하세요 고객님 :)\n가이아코리아 공식몰입니다.\n\n가이아는 신선도와 품질 유지를 위해 좋은 원료와 관리 기준에 많은 신경을 쓰고 있습니다. 더욱 만족스러운 제품과 혜택으로 보답드릴 수 있도록 노력하겠습니다.\n\n소중한 의견 감사합니다!\n평안한 하루 되세요.",
+        },
+        {
+            "id": "gaia-strong-flavor",
+            "title": "향이 강하다 / 쓴맛 관련",
+            "keywords": ["약간 쓰다", "향이 강하다", "익숙하지 않다", "알싸함"],
+            "message": "안녕하세요 고객님 :)\n가이아코리아 공식몰입니다.\n\n올리브오일 풍미에 대한 소중한 의견 남겨주셔서 감사합니다.\n\n엑스트라버진 올리브오일 특유의 향과 약간의 알싸함은 신선한 제품에서 나타나는 특징입니다. 샐러드나 빵, 파스타 등에 활용하시면 더욱 부드럽게 즐기실 수 있습니다.\n\n앞으로도 꾸준히 만족드릴 수 있도록 좋은 품질로 보답하겠습니다!\n평안한 하루 되세요.",
+        },
+        {
+            "id": "gaia-package",
+            "title": "포장 / 누유 / 뚜껑 관련",
+            "keywords": ["오일이 샜다", "뚜껑이 열려 있었다", "입구 사용 불편", "배송 중 흔들림"],
+            "message": "안녕하세요 고객님 :)\n가이아 공식몰입니다.\n\n먼저 이용에 불편을 드려 대단히 죄송합니다.\n말씀 주신 내용을 내부적으로 꼼꼼히 확인하여 제품 및 포장 과정 개선에 참고하도록 하겠습니다. 불편하신 부분은 고객센터로 문의 남겨주시면 빠르게 도움드릴 수 있도록 하겠습니다.\n\n소중한 의견 남겨주셔서 감사합니다.\n편안한 하루 되세요.",
+        },
+        {
+            "id": "gaia-short",
+            "title": "빠른 공통 답변",
+            "keywords": ["맛있어요", "풍미 만족", "재구매", "건강한 식탁", "짧은 답변"],
+            "message": "안녕하세요, 가이아코리아 공식몰입니다.\n소중한 후기 감사드립니다.\n더 만족드릴 수 있도록 노력하겠습니다.\n평안한 하루 되세요.",
+        },
+    ],
+}
+
+
+def default_review_templates() -> dict:
+    return json.loads(json.dumps(DEFAULT_REVIEW_TEMPLATES, ensure_ascii=False))
+
+
+def load_review_templates() -> dict:
+    if not REVIEW_TEMPLATES_PATH.exists():
+        return default_review_templates()
+    try:
+        data = json.loads(REVIEW_TEMPLATES_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return default_review_templates()
+    if not isinstance(data, dict):
+        return default_review_templates()
+    defaults = default_review_templates()
+    return {
+        brand: list(data[brand]) if isinstance(data.get(brand), list) else defaults[brand]
+        for brand in ("alp", "gaia")
+    }
+
+
+def save_review_templates(templates: dict) -> None:
+    REVIEW_TEMPLATES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temporary = REVIEW_TEMPLATES_PATH.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(templates, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    temporary.replace(REVIEW_TEMPLATES_PATH)
+
+
+def get_review_templates() -> dict:
+    with REVIEW_TEMPLATES_LOCK:
+        templates = load_review_templates()
+    return {"brands": templates}
+
+
+def update_review_template(payload: dict) -> dict:
+    action = str(payload.get("action", "")).strip()
+    brand = str(payload.get("brand", "")).strip().lower()
+    if brand not in {"alp", "gaia"}:
+        raise ValueError("ALP 또는 GAEA 브랜드를 선택해주세요.")
+    with REVIEW_TEMPLATES_LOCK:
+        templates = load_review_templates()
+        brand_templates = templates[brand]
+        if action == "save":
+            template_id = str(payload.get("id", "")).strip()
+            title = str(payload.get("title", "")).strip()
+            message = str(payload.get("message", "")).strip()
+            raw_keywords = payload.get("keywords", [])
+            if isinstance(raw_keywords, str):
+                raw_keywords = raw_keywords.split(",")
+            keywords = [
+                str(keyword).strip()
+                for keyword in raw_keywords
+                if str(keyword).strip()
+            ][:12]
+            if not title:
+                raise ValueError("리뷰 유형명을 입력해주세요.")
+            if not message:
+                raise ValueError("응대 템플릿을 입력해주세요.")
+            if len(title) > 100 or len(message) > 3000:
+                raise ValueError("유형명은 100자, 템플릿은 3,000자까지 입력할 수 있습니다.")
+            template = next(
+                (item for item in brand_templates if item.get("id") == template_id),
+                None,
+            )
+            if template is None:
+                template = {"id": uuid4().hex}
+                brand_templates.append(template)
+            template.update(
+                {"title": title, "keywords": keywords, "message": message}
+            )
+            response_template = dict(template)
+        elif action == "delete":
+            template_id = str(payload.get("id", "")).strip()
+            if not any(item.get("id") == template_id for item in brand_templates):
+                raise ValueError("삭제할 리뷰 유형을 찾을 수 없습니다.")
+            templates[brand] = [
+                item for item in brand_templates if item.get("id") != template_id
+            ]
+            response_template = {"id": template_id}
+        elif action == "reset":
+            templates[brand] = default_review_templates()[brand]
+            response_template = {}
+        else:
+            raise ValueError("지원하지 않는 리뷰 템플릿 작업입니다.")
+        save_review_templates(templates)
+    return {"ok": True, "template": response_template, "brands": templates}
 
 
 def default_sales_email_data() -> dict:
@@ -4237,6 +4410,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_html(SALES_EMAIL_HTML_PATH)
             elif path == "/cs-tracker":
                 self.send_html(CS_TRACKER_HTML_PATH)
+            elif path == "/reviews":
+                self.send_html(REVIEW_MANAGEMENT_HTML_PATH)
             elif path == "/theme-meeting.css":
                 self.send_css(THEME_CSS_PATH)
             elif path == "/glass-theme.css":
@@ -4289,6 +4464,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json(public_sales_email_data())
             elif path == "/api/cs-tracker":
                 self.send_json(get_cs_cases())
+            elif path == "/api/reviews":
+                self.send_json(get_review_templates())
             elif path == "/api/brand-connecting":
                 brand_key = parse_qs(parsed.query).get("brand", ["alp"])[0]
                 force_sync = (
@@ -4524,6 +4701,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json(update_sales_email_data(payload))
             elif path == "/api/cs-tracker":
                 self.send_json(update_cs_case(payload))
+            elif path == "/api/reviews":
+                self.send_json(update_review_template(payload))
             elif path == "/api/sales-email/outlook-draft":
                 self.send_json(create_outlook_draft(payload))
             elif path == "/api/meetings/recordings/delete":
