@@ -176,11 +176,21 @@ class BrandConnectProposalDateTest(unittest.TestCase):
         self.assertEqual(normalize_campaign_status("진행완료"), "수락")
         self.assertEqual(normalize_campaign_status("정산/확정 필요"), "수락")
 
-    def test_gaia_clip_uses_current_korea_date(self):
+    def test_gaia_clip_preserves_explicit_proposal_date(self):
         self.assertEqual(normalize_campaign_channel("clip", "gaia"), "clip")
         self.assertEqual(
             resolve_campaign_proposal_date(
                 "2020.01.01",
+                "clip",
+                today=date(2026, 8, 1),
+            ),
+            "2020.01.01",
+        )
+
+    def test_gaia_clip_uses_current_korea_date_only_when_blank(self):
+        self.assertEqual(
+            resolve_campaign_proposal_date(
+                "",
                 "clip",
                 today=date(2026, 8, 1),
             ),

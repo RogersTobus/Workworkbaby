@@ -69,10 +69,12 @@ def resolve_campaign_proposal_date(
     channel: str,
     today: date | None = None,
 ) -> str:
+    if str(value or "").strip():
+        return normalize_proposal_date(value)
     if channel == "clip":
         current = today or datetime.now(KOREA_TIMEZONE).date()
         return current.strftime("%Y.%m.%d")
-    return normalize_proposal_date(value) if str(value or "").strip() else ""
+    return ""
 
 
 def normalize_campaign_status(value: object) -> str:

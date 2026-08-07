@@ -394,7 +394,7 @@
         dateInput.value=row.proposal_date||"";
         if(channelSelect)channelSelect.addEventListener("change",()=>{
             row.channel=channelSelect.value;
-            if(row.channel==="clip"){
+            if(row.channel==="clip"&&!String(row.proposal_date||"").trim()){
               row.proposal_date=todayProposalDate();
               dateInput.value=row.proposal_date;
             }
