@@ -1,3 +1,5 @@
+import json
+import subprocess
 import tempfile
 import unittest
 import sys
@@ -37,6 +39,50 @@ class SalesEmailGroupTests(unittest.TestCase):
                 self.assertEqual(result["contact"]["group"], "8월 제안")
                 public = dm_assistant.public_sales_email_data()
                 self.assertEqual(public["contacts"][0]["group"], "8월 제안")
+
+    def test_outlook_draft_is_launched_without_waiting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data_path = root / "sales_email_data.json"
+            attachment_path = root / "attachments"
+            script_path = root / "open_draft.ps1"
+            script_path.write_text("param([string]$DraftPath)", encoding="utf-8")
+            data_path.write_text(
+                json.dumps(
+                    {
+                        "contacts": [
+                            {
+                                "id": "contact-1",
+                                "name": "Test",
+                                "email": "test@example.com",
+                            }
+                        ],
+                        "templates": [],
+                        "drafts": {},
+                        "history": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.object(dm_assistant, "SALES_EMAIL_DATA_PATH", data_path), patch.object(
+                dm_assistant, "SALES_EMAIL_ATTACHMENTS_DIR", attachment_path
+            ), patch.object(dm_assistant, "APP_DIR", root), patch.object(
+                dm_assistant, "OUTLOOK_POPUP_SCRIPT_PATH", script_path
+            ), patch.object(dm_assistant.subprocess, "Popen") as popen:
+                result = dm_assistant.create_outlook_draft(
+                    {
+                        "contact_id": "contact-1",
+                        "subject": "Subject",
+                        "full_body": "Body",
+                        "full_html": "<p>Body</p>",
+                    }
+                )
+
+            self.assertEqual(result["status"], "opening")
+            popen.assert_called_once()
+            kwargs = popen.call_args.kwargs
+            self.assertEqual(kwargs["stdout"], subprocess.DEVNULL)
+            self.assertNotIn("timeout", kwargs)
 
 
 if __name__ == "__main__":

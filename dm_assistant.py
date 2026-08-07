@@ -820,7 +820,7 @@ def create_outlook_draft(payload: dict) -> dict:
     if not OUTLOOK_POPUP_SCRIPT_PATH.is_file():
         raise ValueError("Outlook 팝업 실행 파일을 찾을 수 없습니다.")
     creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    completed = subprocess.run(
+    subprocess.Popen(
         [
             "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
             "-NoProfile",
@@ -834,20 +834,15 @@ def create_outlook_draft(payload: dict) -> dict:
             "-DraftPath",
             str(eml_path),
         ],
-        capture_output=True,
-        text=True,
-        timeout=15,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
         creationflags=creation_flags,
     )
-    if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout or "").strip()
-        raise ValueError(
-            "새 Outlook 팝업을 열지 못했습니다."
-            + (f" {detail[-400:]}" if detail else "")
-        )
     return {
         "ok": True,
-        "message": "본문·첨부파일·HTML 로고 서명이 포함된 Outlook 초안을 열었습니다.",
+        "status": "opening",
+        "message": "Outlook 초안을 만들었습니다. 창이 백그라운드에서 열립니다.",
         "attachments": len(attachment_paths),
     }
 
